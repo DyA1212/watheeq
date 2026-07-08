@@ -34,7 +34,6 @@ export default function LoginPage() {
       return;
     }
 
-    // حساب الأدمن
     if (
       userEmail === "deaabd89@gmail.com" &&
       password === "dea2008dd"
@@ -48,7 +47,6 @@ export default function LoginPage() {
       return;
     }
 
-    // تسجيل دخول المستخدمين من Supabase
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("*")
@@ -75,22 +73,24 @@ export default function LoginPage() {
 
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
 
-        <h1 className="mb-6 text-center text-2xl font-bold">
+        <h1 className="mb-6 text-center text-2xl font-bold text-gray-900">
           تسجيل الدخول
         </h1>
 
         <input
-          type="text"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
           placeholder="البريد الإلكتروني"
           value={email}
           onChange={(e) =>
             setEmail(
               e.target.value
-                .replace(/[\u0600-\u06FF]/g, "")
-                .replace(/\s/g, "")
+                .replace(/[^a-zA-Z0-9@._+-]/g, "")
+                .toLowerCase()
             )
           }
-          className="mb-4 w-full rounded border p-3"
+          className="mb-4 w-full rounded border p-3 text-gray-900 placeholder:text-gray-500"
           dir="ltr"
         />
 
@@ -101,11 +101,10 @@ export default function LoginPage() {
           onChange={(e) =>
             setPassword(
               e.target.value
-                .replace(/[\u0600-\u06FF]/g, "")
                 .replace(/\s/g, "")
             )
           }
-          className="mb-4 w-full rounded border p-3"
+          className="mb-4 w-full rounded border p-3 text-gray-900 placeholder:text-gray-500"
           dir="ltr"
         />
 
