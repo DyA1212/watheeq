@@ -46,6 +46,7 @@ export default function AdminDealsPage() {
       alert("تم إنهاء الصفقة بنجاح ✅");
     }
 
+
     if (status === "cancelled") {
       alert("تم إلغاء الصفقة ❌");
     }
@@ -58,6 +59,20 @@ export default function AdminDealsPage() {
   useEffect(() => {
     getDeals();
   }, []);
+
+
+  function showStatus(status: string) {
+
+    if (status === "completed") {
+      return "منتهية ✅";
+    }
+
+    if (status === "cancelled") {
+      return "ملغية ❌";
+    }
+
+    return "جارية ⏳";
+  }
 
 
   return (
@@ -149,8 +164,10 @@ export default function AdminDealsPage() {
                     </td>
 
 
-                    <td>
-                      {deal.status}
+                    <td className="font-bold">
+
+                      {showStatus(deal.status)}
+
                     </td>
 
 
@@ -161,33 +178,49 @@ export default function AdminDealsPage() {
                     </td>
 
 
-                    <td className="space-x-2">
+                    <td>
 
 
-                      <button
-                        onClick={() =>
-                          updateStatus(
-                            deal.id,
-                            "completed"
-                          )
-                        }
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg"
-                      >
-                        إنهاء
-                      </button>
+                      {deal.status !== "completed" &&
+                      deal.status !== "cancelled" ? (
+
+                        <div className="flex gap-2 justify-center">
+
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                deal.id,
+                                "completed"
+                              )
+                            }
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg"
+                          >
+                            إنهاء
+                          </button>
 
 
-                      <button
-                        onClick={() =>
-                          updateStatus(
-                            deal.id,
-                            "cancelled"
-                          )
-                        }
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg"
-                      >
-                        إلغاء
-                      </button>
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                deal.id,
+                                "cancelled"
+                              )
+                            }
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg"
+                          >
+                            إلغاء
+                          </button>
+
+
+                        </div>
+
+                      ) : (
+
+                        <span className="font-bold text-gray-700">
+                          لا يوجد إجراء
+                        </span>
+
+                      )}
 
 
                     </td>
