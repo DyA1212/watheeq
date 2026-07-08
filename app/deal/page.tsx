@@ -12,6 +12,7 @@ export default function DealPage() {
 
   const [activeDeals, setActiveDeals] = useState(0);
   const [completedDeals, setCompletedDeals] = useState(0);
+  const [cancelledDeals, setCancelledDeals] = useState(0);
 
 
 
@@ -22,17 +23,13 @@ export default function DealPage() {
 
 
     if (!userId) {
-
       router.push("/login");
       return;
-
     }
 
 
     if (savedName) {
-
       setName(savedName);
-
     }
 
 
@@ -43,15 +40,13 @@ export default function DealPage() {
 
 
 
-
-
   async function loadStats(userId: string) {
 
 
     const { data, error } = await supabase
       .from("deals")
       .select("status")
-      .eq("seller_id", userId);
+      .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`);
 
 
 
@@ -61,7 +56,6 @@ export default function DealPage() {
       return;
 
     }
-
 
 
 
@@ -76,7 +70,6 @@ export default function DealPage() {
 
 
 
-
     const completed = data.filter(
 
       (deal) =>
@@ -86,9 +79,18 @@ export default function DealPage() {
 
 
 
-    setActiveDeals(active);
+    const cancelled = data.filter(
 
+      (deal) =>
+        deal.status === "cancelled"
+
+    ).length;
+
+
+
+    setActiveDeals(active);
     setCompletedDeals(completed);
+    setCancelledDeals(cancelled);
 
 
   }
@@ -101,23 +103,21 @@ export default function DealPage() {
 
     <main className="min-h-screen bg-gray-100 p-6">
 
+
       <div className="max-w-7xl mx-auto">
 
 
 
         <div className="bg-teal-700 rounded-3xl text-white p-8 mb-8">
 
+
           <h1 className="text-4xl font-bold">
-
             👋 أهلاً بك، {name}
-
           </h1>
 
 
           <p className="mt-2 text-lg text-teal-100">
-
             مرحبًا بك في منصة وثيق، اختر الخدمة التي تريدها.
-
           </p>
 
 
@@ -133,7 +133,7 @@ export default function DealPage() {
 
           <a
             href="/deal/new"
-            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition"
+            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition text-gray-900"
           >
 
             <div className="text-5xl mb-4">
@@ -159,7 +159,7 @@ export default function DealPage() {
 
           <a
             href="/deals"
-            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition"
+            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition text-gray-900"
           >
 
             <div className="text-5xl mb-4">
@@ -185,7 +185,7 @@ export default function DealPage() {
 
           <a
             href="/wallet"
-            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition"
+            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition text-gray-900"
           >
 
             <div className="text-5xl mb-4">
@@ -211,7 +211,7 @@ export default function DealPage() {
 
           <a
             href="/profile"
-            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition"
+            className="bg-white rounded-3xl shadow p-8 hover:shadow-xl transition text-gray-900"
           >
 
             <div className="text-5xl mb-4">
@@ -240,18 +240,19 @@ export default function DealPage() {
 
 
 
-        <div className="grid md:grid-cols-3 gap-6 mt-10">
+
+        <div className="grid md:grid-cols-4 gap-6 mt-10">
 
 
 
           <div className="bg-white rounded-2xl shadow p-6">
 
-            <h3 className="text-gray-500">
+            <h3 className="text-gray-700">
               الصفقات النشطة
             </h3>
 
 
-            <p className="text-4xl font-bold mt-3">
+            <p className="text-4xl font-bold mt-3 text-blue-600">
               {activeDeals}
             </p>
 
@@ -264,12 +265,12 @@ export default function DealPage() {
 
           <div className="bg-white rounded-2xl shadow p-6">
 
-            <h3 className="text-gray-500">
-              الصفقات المكتملة
+            <h3 className="text-gray-700">
+              الصفقات المنتهية
             </h3>
 
 
-            <p className="text-4xl font-bold mt-3">
+            <p className="text-4xl font-bold mt-3 text-green-600">
               {completedDeals}
             </p>
 
@@ -282,7 +283,25 @@ export default function DealPage() {
 
           <div className="bg-white rounded-2xl shadow p-6">
 
-            <h3 className="text-gray-500">
+            <h3 className="text-gray-700">
+              الصفقات الملغية
+            </h3>
+
+
+            <p className="text-4xl font-bold mt-3 text-red-600">
+              {cancelledDeals}
+            </p>
+
+
+          </div>
+
+
+
+
+
+          <div className="bg-white rounded-2xl shadow p-6">
+
+            <h3 className="text-gray-700">
               الرصيد
             </h3>
 
