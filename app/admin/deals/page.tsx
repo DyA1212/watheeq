@@ -15,14 +15,19 @@ export default function AdminDealsPage() {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setDeals(data);
+    if (error) {
+      console.log(error.message);
+      setLoading(false);
+      return;
     }
 
+    setDeals(data || []);
     setLoading(false);
   }
 
+
   async function updateStatus(id: string, status: string) {
+
     const { error } = await supabase
       .from("deals")
       .update({
@@ -30,19 +35,36 @@ export default function AdminDealsPage() {
       })
       .eq("id", id);
 
-    if (!error) {
-      getDeals();
+
+    if (error) {
+      alert("حدث خطأ: " + error.message);
+      return;
     }
+
+
+    if (status === "completed") {
+      alert("تم إنهاء الصفقة بنجاح ✅");
+    }
+
+    if (status === "cancelled") {
+      alert("تم إلغاء الصفقة ❌");
+    }
+
+
+    getDeals();
   }
+
 
   useEffect(() => {
     getDeals();
   }, []);
 
+
   return (
     <main className="min-h-screen bg-gray-100 p-8">
 
       <div className="bg-white rounded-xl shadow p-6">
+
 
         <h1 className="text-3xl font-bold text-gray-900 mb-6">
           💼 جميع الصفقات
@@ -50,30 +72,59 @@ export default function AdminDealsPage() {
 
 
         {loading ? (
+
           <p className="text-gray-700">
             جاري التحميل...
           </p>
+
+        ) : deals.length === 0 ? (
+
+          <p className="text-gray-700">
+            لا توجد صفقات حالياً
+          </p>
+
         ) : (
 
           <div className="overflow-x-auto">
 
             <table className="w-full text-center text-gray-900">
 
+
               <thead>
+
                 <tr className="border-b">
 
-                  <th className="p-3">المبلغ</th>
-                  <th>العمولة</th>
-                  <th>حصة البائع</th>
-                  <th>الحالة</th>
-                  <th>تاريخ</th>
-                  <th>التحكم</th>
+                  <th className="p-3">
+                    المبلغ
+                  </th>
+
+                  <th>
+                    العمولة
+                  </th>
+
+                  <th>
+                    حصة البائع
+                  </th>
+
+                  <th>
+                    الحالة
+                  </th>
+
+                  <th>
+                    التاريخ
+                  </th>
+
+                  <th>
+                    التحكم
+                  </th>
 
                 </tr>
+
               </thead>
 
 
               <tbody>
+
 
                 {deals.map((deal) => (
 
@@ -81,6 +132,7 @@ export default function AdminDealsPage() {
                     key={deal.id}
                     className="border-b"
                   >
+
 
                     <td className="p-3">
                       {deal.amount} ر.س
@@ -111,6 +163,7 @@ export default function AdminDealsPage() {
 
                     <td className="space-x-2">
 
+
                       <button
                         onClick={() =>
                           updateStatus(
@@ -118,7 +171,7 @@ export default function AdminDealsPage() {
                             "completed"
                           )
                         }
-                        className="bg-green-600 text-white px-3 py-2 rounded"
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg"
                       >
                         إنهاء
                       </button>
@@ -131,12 +184,14 @@ export default function AdminDealsPage() {
                             "cancelled"
                           )
                         }
-                        className="bg-red-600 text-white px-3 py-2 rounded"
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg"
                       >
                         إلغاء
                       </button>
 
+
                     </td>
+
 
                   </tr>
 
@@ -145,13 +200,17 @@ export default function AdminDealsPage() {
 
               </tbody>
 
+
             </table>
+
 
           </div>
 
         )}
 
+
       </div>
+
 
     </main>
   );
