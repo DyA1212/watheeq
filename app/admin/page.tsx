@@ -1,188 +1,225 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
-export default function AdminPage() {
-  const [allowed, setAllowed] = useState(false);
+export default function AdminUsersPage() {
 
-  useEffect(() => {
-    const email = localStorage.getItem("email");
-    const role = localStorage.getItem("role");
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newPasswords, setNewPasswords] = useState<any>({});
 
-    if (email === "deaabd89@gmail.com" || role === "admin") {
-      setAllowed(true);
+
+  async function loadUsers() {
+
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+
+    if (error) {
+      console.log(error);
+      setLoading(false);
+      return;
     }
-  }, []);
 
-  if (!allowed) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-100">
-        <h1 className="text-2xl font-bold text-red-600">
-          ليس لديك صلاحية الدخول
-        </h1>
-      </main>
-    );
+
+    setUsers(data || []);
+    setLoading(false);
+
   }
 
-  return (
-    <main className="min-h-screen bg-gray-100">
 
-      <header className="bg-white shadow px-8 py-5 flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-teal-700">
-          🛡️ لوحة إدارة وثيق
+
+  async function changePassword(id: string) {
+
+    const password = newPasswords[id];
+
+
+    if (!password || password.length < 8) {
+      alert("كلمة المرور يجب أن تكون 8 أحرف أو أكثر");
+      return;
+    }
+
+
+
+    const { error } = await supabase
+      .from("users")
+      .update({
+        password: password
+      })
+      .eq("id", id);
+
+
+
+    if (error) {
+
+      alert(error.message);
+      return;
+
+    }
+
+
+
+    alert("تم تغيير كلمة المرور بنجاح ✅");
+
+    loadUsers();
+
+  }
+
+
+
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+
+
+  return (
+
+    <main className="min-h-screen bg-gray-100 p-8">
+
+
+      <div className="bg-white rounded-xl shadow p-6">
+
+
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">
+          👥 المستخدمون
         </h1>
 
-        <div className="font-bold text-gray-900">
-          مدير النظام
-        </div>
-      </header>
 
 
-      <div className="flex">
+        {loading ? (
 
-        <aside className="w-72 bg-white min-h-screen shadow">
-
-          <div className="p-6 space-y-3">
-
-            <Link href="/admin">
-              <button className="w-full bg-teal-700 text-white rounded-xl p-4">
-                📊 الرئيسية
-              </button>
-            </Link>
+          <p>
+            جاري التحميل...
+          </p>
 
 
-            <Link href="/admin/users">
-              <button className="w-full border rounded-xl p-4 text-gray-900 hover:bg-gray-100">
-                👥 المستخدمون
-              </button>
-            </Link>
+        ) : (
 
 
-            <Link href="/admin/deals">
-              <button className="w-full border rounded-xl p-4 text-gray-900 hover:bg-gray-100">
-                💼 الصفقات
-              </button>
-            </Link>
-
-
-            <Link href="/admin/wallet">
-              <button className="w-full border rounded-xl p-4 text-gray-900 hover:bg-gray-100">
-                💰 المحفظة
-              </button>
-            </Link>
-
-
-            <Link href="/admin/withdrawals">
-              <button className="w-full border rounded-xl p-4 text-gray-900 hover:bg-gray-100">
-                🏦 السحوبات
-              </button>
-            </Link>
-
-
-            <Link href="/admin/reports">
-              <button className="w-full border rounded-xl p-4 text-gray-900 hover:bg-gray-100">
-                📝 البلاغات
-              </button>
-            </Link>
-
-
-            <Link href="/admin/settings">
-              <button className="w-full border rounded-xl p-4 text-gray-900 hover:bg-gray-100">
-                ⚙️ الإعدادات
-              </button>
-            </Link>
-
-
-          </div>
-
-        </aside>
-
-
-        <section className="flex-1 p-8">
-
-
-          <div className="grid grid-cols-4 gap-6">
-
-
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h2 className="text-gray-700">
-                المستخدمون
-              </h2>
-
-              <p className="text-4xl font-bold mt-4 text-gray-900">
-                0
-              </p>
-            </div>
-
-
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h2 className="text-gray-700">
-                الصفقات
-              </h2>
-
-              <p className="text-4xl font-bold mt-4 text-gray-900">
-                0
-              </p>
-            </div>
-
-
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h2 className="text-gray-700">
-                الأموال المجمدة
-              </h2>
-
-              <p className="text-3xl font-bold mt-4 text-gray-900">
-                0 ر.س
-              </p>
-            </div>
-
-
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h2 className="text-gray-700">
-                أرباح وثيق
-              </h2>
-
-              <p className="text-3xl font-bold mt-4 text-gray-900">
-                0 ر.س
-              </p>
-            </div>
-
-
-          </div>
-
-
-          <div className="bg-white rounded-2xl shadow mt-8 p-6">
-
-            <h2 className="text-2xl font-bold mb-5 text-gray-900">
-              آخر الصفقات
-            </h2>
+          <div className="overflow-x-auto">
 
 
             <table className="w-full text-center text-gray-900">
 
+
               <thead>
+
                 <tr className="border-b">
 
-                  <th className="p-3">#</th>
-                  <th>البائع</th>
-                  <th>المشتري</th>
-                  <th>المبلغ</th>
-                  <th>الحالة</th>
+                  <th className="p-3">
+                    الاسم
+                  </th>
+
+                  <th>
+                    الإيميل
+                  </th>
+
+                  <th>
+                    الجوال
+                  </th>
+
+                  <th>
+                    كلمة المرور
+                  </th>
+
+                  <th>
+                    تاريخ التسجيل
+                  </th>
+
+                  <th>
+                    تعديل
+                  </th>
 
                 </tr>
+
               </thead>
+
 
 
               <tbody>
 
-                <tr>
-                  <td className="p-5" colSpan={5}>
-                    لا توجد بيانات
-                  </td>
-                </tr>
+
+                {users.map((user)=>(
+
+
+                  <tr
+                    key={user.id}
+                    className="border-b"
+                  >
+
+
+                    <td className="p-3">
+                      {user.name}
+                    </td>
+
+
+                    <td>
+                      {user.email}
+                    </td>
+
+
+                    <td>
+                      {user.phone}
+                    </td>
+
+
+                    <td>
+                      {user.password}
+                    </td>
+
+
+                    <td>
+                      {new Date(
+                        user.created_at
+                      ).toLocaleDateString("ar-SA")}
+                    </td>
+
+
+                    <td>
+
+
+                      <input
+                        type="text"
+                        placeholder="الباسورد الجديد"
+                        value={newPasswords[user.id] || ""}
+                        onChange={(e)=>
+                          setNewPasswords({
+                            ...newPasswords,
+                            [user.id]: e.target.value
+                          })
+                        }
+                        className="border rounded p-2 w-40"
+                      />
+
+
+                      <button
+                        onClick={() =>
+                          changePassword(user.id)
+                        }
+                        className="bg-teal-700 text-white px-3 py-2 rounded mr-2"
+                      >
+                        حفظ
+                      </button>
+
+
+                    </td>
+
+
+                  </tr>
+
+
+                ))}
+
 
               </tbody>
+
 
             </table>
 
@@ -190,12 +227,14 @@ export default function AdminPage() {
           </div>
 
 
-        </section>
+        )}
 
 
       </div>
 
 
     </main>
+
   );
+
 }
