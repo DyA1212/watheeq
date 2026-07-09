@@ -34,6 +34,7 @@ export default function LoginPage() {
       return;
     }
 
+    // حساب المدير
     if (
       userEmail === "deaabd89@gmail.com" &&
       password === "dea2008dd"
@@ -47,6 +48,7 @@ export default function LoginPage() {
       return;
     }
 
+    // تسجيل دخول المستخدم
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("*")
@@ -69,14 +71,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-gray-100 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-gray-200">
 
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+        {/* الشعار */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-teal-700 text-3xl font-bold text-white shadow-lg">
+            و
+          </div>
 
-        <h1 className="mb-6 text-center text-2xl font-bold text-gray-900">
-          تسجيل الدخول
-        </h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            تسجيل الدخول
+          </h1>
 
+          <p className="mt-2 text-sm text-gray-500">
+            أهلاً بك في منصة وثيق
+          </p>
+        </div>
+
+        {/* البريد */}
         <input
           type="email"
           inputMode="email"
@@ -90,39 +103,61 @@ export default function LoginPage() {
                 .toLowerCase()
             )
           }
-          className="mb-4 w-full rounded border p-3 text-gray-900 placeholder:text-gray-500"
+          className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 transition focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           dir="ltr"
         />
 
+        {/* كلمة المرور */}
         <input
           type="password"
           placeholder="كلمة المرور"
           value={password}
           onChange={(e) =>
-            setPassword(
-              e.target.value
-                .replace(/\s/g, "")
-            )
+            setPassword(e.target.value.replace(/\s/g, ""))
           }
-          className="mb-4 w-full rounded border p-3 text-gray-900 placeholder:text-gray-500"
+          className="mb-2 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 transition focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           dir="ltr"
         />
 
+        <div className="mb-5 text-left">
+          <button
+            type="button"
+            className="text-sm text-teal-700 hover:underline"
+          >
+            نسيت كلمة المرور؟
+          </button>
+        </div>
+
+        {/* زر الدخول */}
         <button
           onClick={login}
-          className="w-full rounded bg-teal-700 p-3 text-white hover:bg-teal-800"
+          className="w-full rounded-xl bg-teal-700 py-4 text-base font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98]"
         >
           تسجيل الدخول
         </button>
 
+        {/* رسالة الخطأ */}
         {error && (
-          <p className="mt-3 text-center text-sm text-red-600">
+          <p className="mt-4 text-center text-sm text-red-600">
             {error}
           </p>
         )}
 
-      </div>
+        {/* إنشاء حساب */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-600">
+            ليس لديك حساب؟
+          </p>
 
+          <button
+            onClick={() => router.push("/register")}
+            className="mt-3 w-full rounded-xl border-2 border-teal-700 py-3 font-semibold text-teal-700 transition hover:bg-teal-700 hover:text-white"
+          >
+            إنشاء حساب جديد
+          </button>
+        </div>
+
+      </div>
     </div>
   );
 }
