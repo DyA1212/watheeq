@@ -47,7 +47,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // التحقق من وجود الإيميل
     const { data: oldUser, error: checkError } = await supabase
       .from("users")
       .select("id")
@@ -63,21 +62,17 @@ export default function RegisterPage() {
       return;
     }
 
-    // إنشاء المستخدم
     const { data, error } = await supabase
       .from("users")
       .insert({
         name: cleanName,
         email: cleanEmail,
         phone: cleanPhone,
-        password: password,
+        password,
         wallet: 0,
       })
       .select()
       .single();
-
-    console.log("DATA:", data);
-    console.log("ERROR:", error);
 
     if (error) {
       alert(error.message);
@@ -96,23 +91,34 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-6">
-          إنشاء حساب
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-gray-100 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-gray-200">
+
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-teal-700 text-3xl font-bold text-white shadow-lg">
+            و
+          </div>
+
+          <h1 className="text-3xl font-bold text-gray-900">
+            إنشاء حساب
+          </h1>
+
+          <p className="mt-2 text-sm text-gray-500">
+            أنشئ حسابك وابدأ استخدام منصة وثيق
+          </p>
+        </div>
 
         <input
           type="text"
           placeholder="الاسم الكامل"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full border rounded-lg p-3 mb-4"
+          className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
         />
 
         <input
-          type="text"
-          placeholder="الإيميل مثال name@gmail.com"
+          type="email"
+          placeholder="البريد الإلكتروني"
           value={email}
           onChange={(e) =>
             setEmail(
@@ -121,7 +127,7 @@ export default function RegisterPage() {
                 .replace(/\s/g, "")
             )
           }
-          className="w-full border rounded-lg p-3 mb-4"
+          className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           dir="ltr"
         />
 
@@ -132,7 +138,7 @@ export default function RegisterPage() {
           onChange={(e) =>
             setPhone(e.target.value.replace(/[^0-9]/g, ""))
           }
-          className="w-full border rounded-lg p-3 mb-4"
+          className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           dir="ltr"
           maxLength={10}
         />
@@ -142,17 +148,31 @@ export default function RegisterPage() {
           placeholder="كلمة المرور"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded-lg p-3 mb-6"
+          className="mb-6 w-full rounded-xl border border-gray-300 p-4 text-base focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           dir="ltr"
         />
 
         <button
           onClick={register}
-          className="w-full bg-teal-700 hover:bg-teal-800 text-white py-3 rounded-lg font-bold"
+          className="w-full rounded-xl bg-teal-700 py-4 text-base font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98]"
         >
           إنشاء حساب
         </button>
+
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-600">
+            لديك حساب بالفعل؟
+          </p>
+
+          <button
+            onClick={() => router.push("/login")}
+            className="mt-3 w-full rounded-xl border-2 border-teal-700 py-3 font-semibold text-teal-700 transition hover:bg-teal-700 hover:text-white"
+          >
+            تسجيل الدخول
+          </button>
+        </div>
+
       </div>
-    </main>
+    </div>
   );
 }
