@@ -35,8 +35,7 @@ export default function RegisterPage() {
       return;
     }
 
-    const phoneCheck =
-      /^05[0-9]{8}$/;
+    const phoneCheck = /^05[0-9]{8}$/;
 
     if (!phoneCheck.test(cleanPhone)) {
       alert("رقم الجوال غير صحيح مثال: 0512345678");
@@ -48,12 +47,16 @@ export default function RegisterPage() {
       return;
     }
 
-    // التحقق من وجود الإيميل مسبقاً
-    const { data: oldUser } = await supabase
+    // التحقق من وجود الإيميل
+    const { data: oldUser, error: checkError } = await supabase
       .from("users")
       .select("id")
       .eq("email", cleanEmail)
       .maybeSingle();
+
+    if (checkError) {
+      console.log(checkError);
+    }
 
     if (oldUser) {
       alert("الإيميل مستخدم مسبقاً");
@@ -68,16 +71,19 @@ export default function RegisterPage() {
         email: cleanEmail,
         phone: cleanPhone,
         password: password,
+        wallet: 0,
       })
       .select()
       .single();
+
+    console.log("DATA:", data);
+    console.log("ERROR:", error);
 
     if (error) {
       alert(error.message);
       return;
     }
 
-    // تسجيل الدخول مباشرة
     localStorage.setItem("email", data.email);
     localStorage.setItem("name", data.name);
     localStorage.setItem("phone", data.phone);

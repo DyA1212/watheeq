@@ -1,76 +1,108 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function SupportPage() {
 
+  const router = useRouter();
+
+  const [started, setStarted] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [closed, setClosed] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [thankYou, setThankYou] = useState(false);
   const [rating, setRating] = useState(0);
 
 
-
-  useEffect(() => {
-    checkChat();
-  }, []);
-
-
+  const userId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("user_id")
+      : null;
 
 
-  async function checkChat() {
-
-    const userId = localStorage.getItem("user_id");
-
-    if (!userId) return;
+  const userName =
+    typeof window !== "undefined"
+      ? localStorage.getItem("name")
+      : "مستخدم";
 
 
 
-    const { data, error } = await supabase
+  async function loadMessages(){
+
+    if(!userId) return;
+
+
+    const { data,error } = await supabase
       .from("support_messages")
       .select("*")
       .eq("user_id", userId)
-      .order("created_at", {
-        ascending: false
+      .eq("closed", false)
+      .order("created_at",{ascending:true});
+
+
+    if(!error){
+
+      setMessages(data || []);
+
+    }
+
+  }
+
+
+
+
+  async function startChat(){
+
+    if(!userId) return;
+
+
+    await supabase
+      .from("support_messages")
+      .delete()
+      .eq("user_id",userId);
+
+
+
+    const { error } = await supabase
+      .from("support_messages")
+      .insert({
+
+        user_id:userId,
+
+        user_name:userName,
+
+        sender:"user",
+
+        message:
+        "مرحباً 👋 تم فتح محادثة الدعم. سيتم الرد عليك خلال 24 ساعة.",
+
+        closed:false,
+
+        chat_status:"open"
+
       });
 
 
 
     if(error){
+
       console.log(error);
       return;
-    }
-
-
-
-    if(data && data.length > 0){
-
-
-      if(data[0].chat_status === "closed"){
-
-        setClosed(true);
-        setMessages([]);
-        setLoading(false);
-        return;
-
-      }
-
 
     }
 
 
 
-    setMessages(
-      data?.reverse() || []
-    );
+    setMessages([]);
 
-    setLoading(false);
+    setStarted(true);
+
+    loadMessages();
 
   }
-
-
 
 
 
@@ -78,90 +110,33 @@ export default function SupportPage() {
 
   async function sendMessage(){
 
-
-    if(!message.trim()){
-
-      alert("اكتب الرسالة");
-      return;
-
-    }
+    if(!message.trim()) return;
 
 
-
-    const userId = localStorage.getItem("user_id");
-
-
-    if(!userId){
-
-      alert("يجب تسجيل الدخول");
-      return;
-
-    }
-
-
-
-
-    // تأكد أن المحادثة ليست مغلقة
-
-    const { data:last } = await supabase
+    await supabase
       .from("support_messages")
-      .select("chat_status")
-      .eq("user_id",userId)
-      .order("created_at",{
-        ascending:false
-      })
-      .limit(1)
-      .single();
+      .insert({
 
+        user_id:userId,
 
+        user_name:userName,
 
-    if(last?.chat_status === "closed"){
+        sender:"user",
 
-      alert("المحادثة مغلقة، افتح محادثة جديدة");
-      setClosed(true);
-      return;
+        message:message,
 
-    }
+        closed:false,
 
+        chat_status:"open"
 
-
-
-
-    const {error} = await supabase
-      .from("support_messages")
-      .insert([
-
-        {
-          user_id:userId,
-          sender:"user",
-          message:message,
-          chat_status:"open"
-        }
-
-      ]);
-
-
-
-
-    if(error){
-
-      alert(error.message);
-      return;
-
-    }
-
+      });
 
 
     setMessage("");
 
-    checkChat();
-
+    loadMessages();
 
   }
-
-
-
-
 
 
 
@@ -169,87 +144,41 @@ export default function SupportPage() {
   async function closeChat(){
 
 
-    if(rating === 0){
-
-      alert("اختر تقييم قبل إنهاء المحادثة");
-      return;
-
-    }
-
-
-
-    const userId = localStorage.getItem("user_id");
-
-
-    const {error} = await supabase
-      .from("support_messages")
-      .update({
-
-        chat_status:"closed",
-        rating:rating
-
-      })
-      .eq(
-        "user_id",
-        userId
-      );
-
-
-
-    if(error){
-
-      alert(error.message);
-      return;
-
-    }
-
-
-
-    setClosed(true);
-    setMessages([]);
-
-  }
-
-
-
-
-
-
-
-
-  async function newChat(){
-
-
-    const userId = localStorage.getItem("user_id");
-
-
-
-    if(!userId) return;
-
-
-
-
     await supabase
       .from("support_messages")
-      .insert([
-
-        {
-          user_id:userId,
-          sender:"user",
-          message:"بدأت محادثة جديدة",
-          chat_status:"open"
-        }
-
-      ]);
+      .delete()
+      .eq("user_id",userId);
 
 
 
-    setClosed(false);
     setMessages([]);
-    setRating(0);
+
+    setStarted(false);
+
+    setShowConfirm(false);
+
+    setShowRating(true);
+
+  }
+    async function sendRating(){
+
+    if(rating === 0){
+
+      alert("اختر التقييم ⭐");
+      return;
+
+    }
 
 
-    checkChat();
+    setThankYou(true);
+
+
+
+    setTimeout(()=>{
+
+      router.push("/deal");
+
+    },2000);
 
 
   }
@@ -258,87 +187,12 @@ export default function SupportPage() {
 
 
 
+  useEffect(()=>{
 
+    // لا يفتح الشات تلقائي
+    setStarted(false);
 
-
-  if(closed){
-
-
-    return (
-
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-
-
-        <div className="bg-white rounded-3xl shadow p-8 text-center max-w-md">
-
-
-          <h1 className="text-3xl font-bold text-teal-700 mb-4">
-            انتهت المحادثة
-          </h1>
-
-
-
-          <p className="text-gray-600 mb-5">
-            قيّم تجربتك مع الدعم الفني
-          </p>
-
-
-
-
-          <div className="flex justify-center gap-2 text-4xl mb-6">
-
-
-            {[1,2,3,4,5].map((star)=>(
-
-              <button
-                key={star}
-                onClick={()=>setRating(star)}
-              >
-
-                {star <= rating ? "⭐":"☆"}
-
-              </button>
-
-            ))}
-
-
-          </div>
-
-
-
-
-
-          <button
-            onClick={newChat}
-            className="w-full bg-teal-700 text-white py-3 rounded-xl mb-3"
-          >
-            فتح محادثة جديدة
-          </button>
-
-
-
-
-
-          <button
-            onClick={()=>window.location.href="/deal"}
-            className="w-full bg-gray-700 text-white py-3 rounded-xl"
-          >
-            انتهاء
-          </button>
-
-
-
-        </div>
-
-
-      </main>
-
-    );
-
-  }
-
-
-
+  },[]);
 
 
 
@@ -349,164 +203,298 @@ export default function SupportPage() {
     <main className="min-h-screen bg-gray-100 p-6">
 
 
-      <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow p-6">
+      <div className="max-w-xl mx-auto bg-white rounded-3xl shadow-lg p-6">
 
 
-
-        <h1 className="text-3xl font-bold text-teal-700 mb-2">
-          💬 الدعم الفني
+        <h1 className="text-3xl font-bold text-center mb-8">
+          🎧 الدعم الفني
         </h1>
 
 
 
-        <p className="text-gray-500 mb-6">
-          وقت انتظار الرد عادة أقل من 10 دقائق
-        </p>
+        {!started && !showRating && !thankYou && (
 
+          <div className="space-y-4">
 
-
-
-
-        <div className="h-96 overflow-y-auto bg-gray-100 rounded-xl p-4 mb-4">
-
-
-          {loading ? (
-
-            <p>
-              جاري التحميل...
-            </p>
-
-
-          ) : messages.length === 0 ? (
-
-            <p className="text-center text-gray-500">
-              ابدأ المحادثة
-            </p>
-
-
-          ) : (
-
-
-            messages.map((msg)=>(
-
-              <div
-                key={msg.id}
-                className={
-                  msg.sender==="user"
-                  ?
-                  "text-right mb-3"
-                  :
-                  "text-left mb-3"
-                }
-              >
-
-                <span
-                  className={
-                    msg.sender==="user"
-                    ?
-                    "inline-block bg-teal-700 text-white p-3 rounded-xl"
-                    :
-                    "inline-block bg-gray-200 p-3 rounded-xl"
-                  }
-                >
-
-                  {msg.message}
-
-                </span>
-
-
-              </div>
-
-
-            ))
-
-          )}
-
-
-        </div>
-
-
-
-
-
-
-        <textarea
-
-          value={message}
-
-          onChange={(e)=>setMessage(e.target.value)}
-
-          placeholder="اكتب رسالتك..."
-
-          className="w-full border rounded-xl p-3 h-28 mb-3"
-
-        />
-
-
-
-
-
-        <button
-
-          onClick={sendMessage}
-
-          className="w-full bg-teal-700 text-white py-3 rounded-xl mb-4 font-bold"
-
-        >
-
-          إرسال
-
-        </button>
-
-
-
-
-
-
-
-        <p className="text-center text-gray-500 mb-2">
-          اختر تقييمك قبل الإنهاء
-        </p>
-
-
-
-
-
-        <div className="flex justify-center text-3xl mb-3">
-
-
-          {[1,2,3,4,5].map((star)=>(
 
             <button
-              key={star}
-              onClick={()=>setRating(star)}
+
+              onClick={startChat}
+
+              className="w-full bg-teal-700 hover:bg-teal-800 text-white p-4 rounded-2xl font-bold"
+
+            >
+              💬 التواصل مع الدعم الفني
+            </button>
+
+
+
+            <button
+
+              onClick={()=>router.push("/support/ticket")}
+
+              className="w-full border-2 border-gray-300 p-4 rounded-2xl font-bold hover:bg-gray-100"
+
+            >
+              🎫 ترك تذكرة
+            </button>
+
+
+
+          </div>
+
+        )}
+
+
+
+
+
+
+        {started && !showRating && (
+
+          <>
+
+
+            <div className="bg-gray-100 rounded-2xl p-4 h-96 overflow-y-auto mb-4">
+
+
+              {messages.map((m)=>(
+
+
+                <div
+
+                  key={m.id}
+
+                  className={`flex mb-3 ${
+                    m.sender === "user"
+                    ? "justify-end"
+                    : "justify-start"
+                  }`}
+
+                >
+
+
+                  <div
+
+                    className={`max-w-[75%] px-4 py-3 rounded-2xl text-white ${
+                      
+                      m.sender === "user"
+                      ? "bg-teal-700 rounded-br-none"
+                      : "bg-gray-600 rounded-bl-none"
+
+                    }`}
+
+                  >
+
+                    {m.message}
+
+                  </div>
+
+
+                </div>
+
+
+              ))}
+
+
+            </div>
+
+
+
+
+
+            <div className="flex gap-2">
+
+
+              <input
+
+                value={message}
+
+                onChange={(e)=>setMessage(e.target.value)}
+
+                placeholder="اكتب رسالتك..."
+
+                className="flex-1 border rounded-2xl p-3 outline-none"
+
+              />
+
+
+
+              <button
+
+                onClick={sendMessage}
+
+                className="bg-teal-700 text-white px-5 rounded-2xl font-bold"
+
+              >
+
+                إرسال
+
+              </button>
+
+
+            </div>
+
+
+
+
+
+            <button
+
+              onClick={()=>setShowConfirm(true)}
+
+              className="mt-4 text-red-600 border border-red-600 px-5 py-2 rounded-xl text-sm"
+
             >
 
-              {star <= rating ? "⭐":"☆"}
+              إنهاء الدردشة
 
             </button>
 
-          ))}
 
 
-        </div>
+          </>
+
+        )}
 
 
 
 
 
 
-        <button
+        {showConfirm && (
 
-          onClick={closeChat}
 
-          className="w-full bg-red-600 text-white py-3 rounded-xl font-bold"
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
 
-        >
 
-          إنهاء المحادثة
+            <div className="bg-white rounded-3xl p-6 w-80 text-center">
 
-        </button>
+
+              <h2 className="font-bold text-xl mb-5">
+                هل تريد إنهاء الدردشة؟
+              </h2>
+
+
+
+              <button
+
+                onClick={closeChat}
+
+                className="bg-red-600 text-white px-6 py-2 rounded-xl mx-2"
+
+              >
+
+                نعم
+
+              </button>
+
+
+
+              <button
+
+                onClick={()=>setShowConfirm(false)}
+
+                className="bg-gray-300 px-6 py-2 rounded-xl mx-2"
+
+              >
+
+                لا
+
+              </button>
+
+
+            </div>
+
+
+          </div>
+
+
+        )}
+                {showRating && !thankYou && (
+
+          <div className="text-center">
+
+
+            <h2 className="text-2xl font-bold mb-6">
+              ⭐ قيّم خدمة الدعم
+            </h2>
+
+
+
+            <div className="flex justify-center gap-3 text-4xl">
+
+
+              {[1,2,3,4,5].map((x)=>(
+
+                <button
+
+                  key={x}
+
+                  onClick={()=>setRating(x)}
+
+                >
+
+                  {x <= rating ? "⭐" : "☆"}
+
+                </button>
+
+              ))}
+
+
+            </div>
+
+
+
+
+
+            <button
+
+              onClick={sendRating}
+
+              className="mt-6 bg-teal-700 hover:bg-teal-800 text-white px-8 py-3 rounded-2xl font-bold"
+
+            >
+
+              إرسال التقييم
+
+            </button>
+
+
+
+          </div>
+
+        )}
+
+
+
+
+
+
+
+        {thankYou && (
+
+          <div className="text-center">
+
+
+            <h2 className="text-3xl font-bold text-teal-700 mb-4">
+
+              شكراً على تقييمك ⭐
+
+            </h2>
+
+
+            <p className="text-gray-500">
+
+              سيتم تحويلك للصفحة الرئيسية...
+
+            </p>
+
+
+          </div>
+
+        )}
+
 
 
 
@@ -514,6 +502,7 @@ export default function SupportPage() {
 
 
     </main>
+
 
   );
 
