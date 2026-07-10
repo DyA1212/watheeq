@@ -12,30 +12,85 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ضبط عام */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+/* رجعنا السكرول الطبيعي للابتوب والجوال */
+html {
+  background: #f9fafb;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: auto;
+}
+
+body {
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* مهم: لا نخفي السكرول */
 * {
   box-sizing: border-box;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+#__next {
+  width: 100%;
+  min-height: 100%;
 }
 
-/* وضوح النصوص */
+/* الألوان الأساسية */
 h1,
 h2,
 h3,
 h4,
 h5,
-h6 {
-  color: #111827;
-}
-
+h6,
 p,
 span,
 label {
+  color: inherit;
+}
+
+/* الكروت البيضاء */
+.bg-white {
   color: #111827;
+}
+
+/* النص الأبيض فقط لما يكون الكلاس text-white */
+.text-white {
+  color: #ffffff !important;
+}
+
+.text-white * {
+  color: inherit;
+}
+
+/* الهيدر الأخضر */
+.bg-teal-700,
+.bg-teal-800,
+.bg-teal-900 {
+  color: #ffffff;
+}
+
+.bg-teal-700 *,
+.bg-teal-800 *,
+.bg-teal-900 * {
+  color: inherit;
+}
+
+/* النص الفاتح داخل الهيدر */
+.text-teal-100 {
+  color: #ccfbf1 !important;
 }
 
 /* الحقول */
@@ -45,6 +100,7 @@ select {
   background-color: #ffffff !important;
   color: #111827 !important;
   border: 1px solid #9ca3af !important;
+  font-size: 16px;
 }
 
 input::placeholder,
@@ -56,9 +112,25 @@ textarea::placeholder {
 /* الأزرار */
 button {
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* النصوص داخل الكروت */
-.bg-white {
-  color: #111827;
+a,
+button {
+  outline: none;
+}
+
+/* منع تمدد الصفحة يمين ويسار */
+main {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* تحسين لمس الجوال */
+button,
+input,
+textarea,
+select {
+  touch-action: manipulation;
 }
