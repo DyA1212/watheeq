@@ -85,7 +85,7 @@ export default function DealPage() {
       return;
     }
 
-    const userId = localStorage.getItem("user_id");
+    const userId = sessionStorage.getItem("user_id");
 
     if (!userId) {
       alert("لم يتم العثور على حساب المستخدم");

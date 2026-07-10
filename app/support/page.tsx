@@ -19,13 +19,13 @@ export default function SupportPage() {
 
   const userId =
     typeof window !== "undefined"
-      ? localStorage.getItem("user_id")
+      ? sessionStorage.getItem("user_id")
       : null;
 
 
   const userName =
     typeof window !== "undefined"
-      ? localStorage.getItem("name")
+      ? sessionStorage.getItem("name")
       : "مستخدم";
 
 

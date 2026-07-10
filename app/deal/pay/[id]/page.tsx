@@ -27,17 +27,56 @@ export default function PaymentPage() {
           console.error("خطأ في جلب الصفقة:", dealError);
           return;
         }
-        setDeal(dealData);
 
-       const currentUserId = localStorage.getItem("user_id");
+       const currentUserId = sessionStorage.getItem("user_id");
 
+if (!currentUserId) {
+  alert("يجب تسجيل الدخول أولاً لفتح رابط الدفع");
+  window.location.href = "/login";
+  return;
+}
+
+// منع البائع من فتح رابط الدفع
 if (
-  currentUserId &&
-  dealData &&
-  String(currentUserId).trim() === String(dealData.seller_id).trim()
+  String(currentUserId).trim() ===
+  String(dealData.seller_id).trim()
 ) {
   setIsSeller(true);
+  return;
 }
+
+// أول مشتري يفتح الرابط يتم ربط الصفقة بحسابه
+if (!dealData.buyer_id) {
+  const { data: updatedDeal, error: buyerError } = await supabase
+    .from("deals")
+    .update({
+      buyer_id: currentUserId,
+    })
+    .eq("id", id)
+    .is("buyer_id", null)
+    .select()
+    .single();
+
+  if (buyerError || !updatedDeal) {
+    alert("تعذر ربط الصفقة بالمشتري");
+    return;
+  }
+
+  setDeal(updatedDeal);
+  return;
+}
+
+// منع أي حساب غير المشتري المرتبط
+if (
+  String(currentUserId).trim() !==
+  String(dealData.buyer_id).trim()
+) {
+  alert("هذا الرابط مخصص لمشتري آخر");
+  window.location.href = "/deal";
+  return;
+}
+
+setDeal(dealData);
         
       } catch (err) {
         console.error("حدث خطأ أثناء التحقق من الهوية:", err);
@@ -126,30 +165,51 @@ if (
     return status;
   }
 
-  if (checkingAuth || !deal) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-lg font-bold text-teal-700 animate-pulse" dir="rtl">
-          جاري تحميل بيانات الصفقة والتحقق من الأمان...
-        </div>
-      </main>
-    );
-  }
+ if (checkingAuth) {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div
+        className="text-lg font-bold text-teal-700 animate-pulse"
+        dir="rtl"
+      >
+        جاري تحميل بيانات الصفقة والتحقق من الأمان...
+      </div>
+    </main>
+  );
+}
 
-  // 🛑 حظر البائع فقط
-  if (isSeller) {
-    return (
-      <main className="min-h-screen bg-gray-100 p-6 flex items-center justify-center" dir="rtl">
-        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center border-t-4 border-red-500">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">غير مسموح بالدخول</h1>
-          <p className="text-gray-600 leading-relaxed">
-            أنت بائع هذه الصفقة. هذا الرابط مخصص فقط للمشتري لإتمام عملية الدفع وتأكيد استلام السلعة.
-          </p>
-        </div>
-      </main>
-    );
-  }
+// حظر البائع
+if (isSeller) {
+  return (
+    <main
+      className="min-h-screen bg-gray-100 p-6 flex items-center justify-center"
+      dir="rtl"
+    >
+      <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center border-t-4 border-red-500">
+        <div className="text-red-500 text-5xl mb-4">⚠️</div>
+
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          غير مسموح بالدخول
+        </h1>
+
+        <p className="text-gray-600 leading-relaxed">
+          أنت بائع هذه الصفقة. هذا الرابط مخصص فقط للمشتري لإتمام
+          عملية الدفع وتأكيد استلام السلعة.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+if (!deal) {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-lg font-bold text-red-600" dir="rtl">
+        تعذر تحميل بيانات الصفقة
+      </div>
+    </main>
+  );
+}
 
   // إذا لم تكن البائع (مشتري أو زائر) سيعرض لك الصفحة ولن يحجبها بـ "يرجى تسجيل الدخول"
   return (

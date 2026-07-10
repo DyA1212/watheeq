@@ -33,7 +33,7 @@ export default function WalletPage() {
 
   async function loadWallet(){
 
-    const userId = localStorage.getItem("user_id");
+    const userId = sessionStorage.getItem("user_id");
 
     if(!userId) return;
 
@@ -69,7 +69,7 @@ export default function WalletPage() {
   async function saveWallet(){
 
 
-    const userId = localStorage.getItem("user_id");
+    const userId = sessionStorage.getItem("user_id");
 
 
     if(!userId){

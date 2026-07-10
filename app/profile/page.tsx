@@ -17,12 +17,12 @@ export default function ProfilePage() {
 
   useEffect(() => {
 
-    const savedName = localStorage.getItem("name");
-    const savedPhone = localStorage.getItem("phone");
-    const savedImage = localStorage.getItem("profile_image");
+    const savedName = sessionStorage.getItem("name");
+    const savedPhone = sessionStorage.getItem("phone");
+    const savedImage = sessionStorage.getItem("profile_image");
 
-    const role = localStorage.getItem("role");
-    const email = localStorage.getItem("email");
+    const role = sessionStorage.getItem("role");
+    const email = sessionStorage.getItem("email");
 
 
 
@@ -47,14 +47,14 @@ export default function ProfilePage() {
 
   function saveData(){
 
-    localStorage.setItem("name", name);
+    sessionStorage.setItem("name", name);
 
-    localStorage.setItem("phone", phone);
+    sessionStorage.setItem("phone", phone);
 
 
     if(image){
 
-      localStorage.setItem(
+      sessionStorage.setItem(
         "profile_image",
         image
       );
@@ -80,12 +80,12 @@ export default function ProfilePage() {
 
     if(confirmDelete){
 
-      localStorage.removeItem("name");
-      localStorage.removeItem("phone");
-      localStorage.removeItem("user");
-      localStorage.removeItem("email");
-      localStorage.removeItem("role");
-      localStorage.removeItem("profile_image");
+      sessionStorage.removeItem("name");
+      sessionStorage.removeItem("phone");
+      sessionStorage.removeItem("user");
+      sessionStorage.removeItem("email");
+      sessionStorage.removeItem("role");
+      sessionStorage.removeItem("profile_image");
 
 
       alert("تم حذف الحساب بنجاح");
@@ -221,7 +221,7 @@ export default function ProfilePage() {
                   setImage(imageBase64);
 
 
-                  localStorage.setItem(
+                  sessionStorage.setItem(
                     "profile_image",
                     imageBase64
                   );

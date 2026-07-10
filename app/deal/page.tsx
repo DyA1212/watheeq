@@ -16,8 +16,8 @@ export default function DealPage() {
   useEffect(() => {
 
 
-    const userId = localStorage.getItem("user_id");
-    const savedName = localStorage.getItem("name");
+    const userId = sessionStorage.getItem("user_id");
+    const savedName = sessionStorage.getItem("name");
 
 
 

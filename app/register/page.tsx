@@ -79,11 +79,11 @@ export default function RegisterPage() {
       return;
     }
 
-    localStorage.setItem("email", data.email);
-    localStorage.setItem("name", data.name);
-    localStorage.setItem("phone", data.phone);
-    localStorage.setItem("role", "user");
-    localStorage.setItem("user_id", data.id);
+    sessionStorage.setItem("email", data.email);
+    sessionStorage.setItem("name", data.name);
+    sessionStorage.setItem("phone", data.phone);
+    sessionStorage.setItem("role", "user");
+    sessionStorage.setItem("user_id", data.id);
 
     alert("تم إنشاء الحساب بنجاح ✅");
 

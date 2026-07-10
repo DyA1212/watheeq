@@ -24,7 +24,7 @@ export default function DealsPage() {
   async function loadDeals(){
 
 
-    const userId = localStorage.getItem("user_id");
+    const userId = sessionStorage.getItem("user_id");
 
 
     if(!userId){
