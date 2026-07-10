@@ -1,68 +1,204 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
+
 export default function TermsPage(){
+
+  const router = useRouter();
+
 
   return (
 
-    <main className="min-h-screen bg-gray-100 p-6">
-
-      <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow p-8">
-
-        <h1 className="text-3xl font-bold text-teal-700 mb-6">
-          الشروط والأحكام
-        </h1>
-
-
-        <div className="space-y-5 text-gray-700 leading-8">
+    <main className="
+    min-h-screen
+    bg-gray-100
+    p-4
+    pb-10
+    ">
 
 
-          <p>
-            باستخدامك منصة وثيق فإنك توافق على الالتزام بهذه الشروط والأحكام.
-          </p>
+      <div className="
+      max-w-3xl
+      mx-auto
+      ">
 
 
-          <h2 className="text-xl font-bold">
-            1- استخدام المنصة
-          </h2>
+        {/* العنوان */}
 
-          <p>
-            تستخدم المنصة لإنشاء وإدارة عمليات الوساطة بين الأطراف بطريقة منظمة وآمنة.
-            يجب على المستخدم تقديم معلومات صحيحة وعدم استخدام المنصة لأي نشاط مخالف للأنظمة.
-          </p>
-
-
-
-          <h2 className="text-xl font-bold">
-            2- مسؤولية المستخدم
-          </h2>
-
-          <p>
-            المستخدم مسؤول عن صحة البيانات التي يقدمها وعن جميع العمليات التي يقوم بها داخل المنصة.
-          </p>
+        <div className="
+        bg-teal-700
+        text-white
+        rounded-3xl
+        p-6
+        mb-5
+        shadow
+        ">
 
 
+          <button
 
-          <h2 className="text-xl font-bold">
-            3- الرسوم والعمولة
-          </h2>
+          onClick={()=>router.back()}
 
-          <p>
-            يتم خصم رسوم الخدمة حسب النسبة الموضحة داخل المنصة قبل تحويل المبلغ للمستفيد.
-          </p>
+          className="
+          bg-white/20
+          rounded-full
+          px-4
+          py-2
+          text-sm
+          mb-5
+          "
+
+          >
+            ← رجوع
+          </button>
 
 
 
-          <h2 className="text-xl font-bold">
-            4- إيقاف الحساب
-          </h2>
+          <h1 className="
+          text-3xl
+          font-bold
+          ">
+            الشروط والأحكام
+          </h1>
 
-          <p>
-            يحق للمنصة إيقاف أي حساب يستخدم الخدمة بطريقة مخالفة أو يقدم بيانات غير صحيحة.
+
+          <p className="
+          text-teal-100
+          mt-2
+          ">
+            تعرف على شروط استخدام منصة وثيق
           </p>
 
 
         </div>
 
 
+
+
+
+
+        <div className="
+        bg-white
+        rounded-3xl
+        shadow
+        p-5
+        space-y-5
+        ">
+
+
+
+          <section className="
+          bg-gray-50
+          rounded-2xl
+          p-5
+          ">
+
+            <h2 className="font-bold text-lg mb-2">
+              📌 استخدام المنصة
+            </h2>
+
+            <p className="text-gray-600 leading-8">
+
+              باستخدامك منصة وثيق فإنك توافق على الالتزام
+              بهذه الشروط والأحكام، واستخدام المنصة بطريقة
+              نظامية وآمنة.
+
+            </p>
+
+          </section>
+
+
+
+
+
+
+
+          <section className="
+          bg-gray-50
+          rounded-2xl
+          p-5
+          ">
+
+            <h2 className="font-bold text-lg mb-2">
+              👤 مسؤولية المستخدم
+            </h2>
+
+            <p className="text-gray-600 leading-8">
+
+              المستخدم مسؤول عن صحة البيانات والمعلومات
+              التي يقدمها وعن جميع العمليات التي يقوم بها
+              داخل المنصة.
+
+            </p>
+
+          </section>
+
+
+
+
+
+
+
+          <section className="
+          bg-gray-50
+          rounded-2xl
+          p-5
+          ">
+
+
+            <h2 className="font-bold text-lg mb-2">
+              💳 الرسوم والعمولة
+            </h2>
+
+
+            <p className="text-gray-600 leading-8">
+
+              يتم تطبيق رسوم الخدمة حسب النسبة الموضحة
+              داخل المنصة قبل تحويل المبالغ للمستفيد.
+
+            </p>
+
+
+          </section>
+
+
+
+
+
+
+
+          <section className="
+          bg-gray-50
+          rounded-2xl
+          p-5
+          ">
+
+
+            <h2 className="font-bold text-lg mb-2">
+              🔒 إيقاف الحساب
+            </h2>
+
+
+            <p className="text-gray-600 leading-8">
+
+              يحق لمنصة وثيق إيقاف الحسابات التي تستخدم
+              الخدمة بشكل مخالف أو تقدم معلومات غير صحيحة.
+
+            </p>
+
+
+          </section>
+
+
+
+
+        </div>
+
+
+
       </div>
+
 
     </main>
 

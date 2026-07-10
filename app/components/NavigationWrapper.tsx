@@ -12,13 +12,18 @@ export default function NavigationWrapper(){
   const hideNav = [
     "/",
     "/login",
-    "/register"
+    "/register",
+    "/signup",
+    "/terms",
+    "/privacy",
   ];
+
 
 
   if(hideNav.includes(pathname)){
     return null;
   }
+
 
 
   return <BottomNav />;
