@@ -7,45 +7,59 @@ import { supabase } from "@/lib/supabase";
 export default function PaymentPage() {
   const params = useParams();
   const id = params.id as string;
-
   const [deal, setDeal] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  
+  const [isSeller, setIsSeller] = useState(false); 
+  const [checkingAuth, setCheckingAuth] = useState(true); 
 
   useEffect(() => {
-    async function getDeal() {
-      const { data, error } = await supabase
-        .from("deals")
-        .select("*")
-        .eq("id", id)
-        .single();
+    async function getDealAndCheckUser() {
+      try {
+        // 1. جلب بيانات الصفقة
+        const { data: dealData, error: dealError } = await supabase
+          .from("deals")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-      if (error) {
-        console.log(error);
-        return;
+        if (dealError) {
+          console.error("خطأ في جلب الصفقة:", dealError);
+          return;
+        }
+        setDeal(dealData);
+
+       const currentUserId = localStorage.getItem("user_id");
+
+if (
+  currentUserId &&
+  dealData &&
+  String(currentUserId).trim() === String(dealData.seller_id).trim()
+) {
+  setIsSeller(true);
+}
+        
+      } catch (err) {
+        console.error("حدث خطأ أثناء التحقق من الهوية:", err);
+      } finally {
+        setCheckingAuth(false);
       }
-
-      setDeal(data);
     }
 
     if (id) {
-      getDeal();
+      getDealAndCheckUser();
     }
   }, [id]);
 
   async function updateStatus(newStatus: string) {
     setLoading(true);
-
     try {
       const { error } = await supabase
         .from("deals")
-        .update({
-          status: newStatus,
-        })
+        .update({ status: newStatus })
         .eq("id", id);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (newStatus === "paid") {
         const { data: wallet } = await supabase
@@ -58,9 +72,7 @@ export default function PaymentPage() {
           await supabase
             .from("admin_wallet")
             .update({
-              total_profit:
-                Number(wallet.total_profit || 0) +
-                Number(deal.commission || 0),
+              total_profit: Number(wallet.total_profit || 0) + Number(deal.commission || 0),
               updated_at: new Date().toISOString(),
             })
             .eq("id", 1);
@@ -75,38 +87,31 @@ export default function PaymentPage() {
         }
       }
 
-      // تحويل المبلغ للبائع عند اكتمال الصفقة
-if (newStatus === "completed") {
-  const { data: wallet } = await supabase
-    .from("wallets")
-    .select("balance")
-    .eq("user_id", deal.seller_id)
-    .maybeSingle();
+      if (newStatus === "completed") {
+        const { data: wallet } = await supabase
+          .from("wallets")
+          .select("balance")
+          .eq("user_id", deal.seller_id)
+          .maybeSingle();
 
-  if (wallet) {
-    await supabase
-      .from("wallets")
-      .update({
-        balance:
-          Number(wallet.balance || 0) +
-          Number(deal.seller_amount || 0),
-      })
-      .eq("user_id", deal.seller_id);
-  } else {
-    await supabase
-      .from("wallets")
-      .insert({
-        user_id: deal.seller_id,
-        balance: Number(deal.seller_amount || 0),
-      });
-  }
-}
+        if (wallet) {
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(wallet.balance || 0) + Number(deal.seller_amount || 0),
+            })
+            .eq("user_id", deal.seller_id);
+        } else {
+          await supabase
+            .from("wallets")
+            .insert({
+              user_id: deal.seller_id,
+              balance: Number(deal.seller_amount || 0),
+            });
+        }
+      }
 
-      setDeal({
-        ...deal,
-        status: newStatus,
-      });
-
+      setDeal({ ...deal, status: newStatus });
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -118,28 +123,43 @@ if (newStatus === "completed") {
     if (status === "pending") return "بانتظار الدفع";
     if (status === "paid") return "مجمّد";
     if (status === "completed") return "مكتملة";
-
     return status;
   }
 
-  if (!deal) {
+  if (checkingAuth || !deal) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        جاري تحميل الصفقة...
+      <main className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-lg font-bold text-teal-700 animate-pulse" dir="rtl">
+          جاري تحميل بيانات الصفقة والتحقق من الأمان...
+        </div>
       </main>
     );
   }
 
+  // 🛑 حظر البائع فقط
+  if (isSeller) {
+    return (
+      <main className="min-h-screen bg-gray-100 p-6 flex items-center justify-center" dir="rtl">
+        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center border-t-4 border-red-500">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">غير مسموح بالدخول</h1>
+          <p className="text-gray-600 leading-relaxed">
+            أنت بائع هذه الصفقة. هذا الرابط مخصص فقط للمشتري لإتمام عملية الدفع وتأكيد استلام السلعة.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // إذا لم تكن البائع (مشتري أو زائر) سيعرض لك الصفحة ولن يحجبها بـ "يرجى تسجيل الدخول"
   return (
     <main className="min-h-screen bg-gray-100 p-6 flex justify-center">
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-xl">
-
         <h1 className="text-3xl font-bold text-teal-700 mb-6 text-center">
           💳 دفع الصفقة
         </h1>
 
-        <div className="space-y-5">
-
+        <div className="space-y-5 text-right" dir="rtl">
           <div>
             <p className="text-gray-500">وصف المنتج</p>
             <p className="font-bold">{deal.description}</p>
@@ -147,75 +167,56 @@ if (newStatus === "completed") {
 
           <div>
             <p className="text-gray-500">السعر</p>
-            <p className="font-bold text-xl">
-              {deal.amount} ر.س
-            </p>
+            <p className="font-bold text-xl"> {deal.amount} ر.س </p>
           </div>
 
           <div>
             <p className="text-gray-500">عمولة وثيق</p>
-            <p className="font-bold">
-              {deal.commission} ر.س
-            </p>
+            <p className="font-bold"> {deal.commission} ر.س </p>
           </div>
 
           <div className="bg-green-50 rounded-xl p-4">
-            <p className="text-green-700 font-bold">
-              المبلغ للبائع
-            </p>
-
-            <p className="text-xl font-bold">
-              {deal.seller_amount} ر.س
-            </p>
+            <p className="text-green-700 font-bold"> المبلغ للبائع </p>
+            <p className="text-xl font-bold"> {deal.seller_amount} ر.س </p>
           </div>
 
           <div className="bg-gray-100 rounded-xl p-4">
-            <p>الحالة</p>
-
+            <p className="text-gray-500">الحالة</p>
             <p className="font-bold text-teal-700">
               {getStatus(deal.status)}
             </p>
           </div>
 
-
           {deal.status === "pending" && (
             <button
               onClick={() => updateStatus("paid")}
               disabled={loading}
-              className="w-full bg-teal-700 hover:bg-teal-800 text-white py-4 rounded-xl font-bold text-lg"
+              className="w-full bg-teal-700 hover:bg-teal-800 text-white py-4 rounded-xl font-bold text-lg transition-colors"
             >
               {loading ? "جاري الدفع..." : "💳 ادفع الآن"}
             </button>
           )}
 
-
           {deal.status === "paid" && (
-            <>
+            <div className="space-y-3">
               <div className="bg-yellow-100 text-yellow-700 p-4 rounded-xl text-center font-bold">
-                🔒 تم الدفع
-                <br />
-                المبلغ مجمد حتى تأكيد الاستلام
+                🔒 تم الدفع <br /> المبلغ مجمد حتى تأكيد الاستلام
               </div>
-
               <button
                 onClick={() => updateStatus("completed")}
                 disabled={loading}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg"
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition-colors"
               >
                 {loading ? "جاري التأكيد..." : "✅ تم الاستلام"}
               </button>
-            </>
-          )}
-
-
-          {deal.status === "completed" && (
-            <div className="bg-green-100 text-green-700 p-4 rounded-xl text-center font-bold">
-              ✅ اكتملت الصفقة
-              <br />
-              💰 تم تحويل المبلغ إلى محفظة البائع
             </div>
           )}
 
+          {deal.status === "completed" && (
+            <div className="bg-green-100 text-green-700 p-4 rounded-xl text-center font-bold">
+              ✅ اكتملت الصفقة <br /> 💰 تم تحويل المبلغ إلى محفظة البائع
+            </div>
+          )}
         </div>
       </div>
     </main>
