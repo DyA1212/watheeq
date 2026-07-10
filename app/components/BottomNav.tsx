@@ -10,72 +10,48 @@ export default function BottomNav(){
 
 
 
-  const items = [
-    {
-      name:"الرئيسية",
-      icon:"🏠",
-      path:"/deal"
-    },
-    {
-      name:"صفقاتي",
-      icon:"📋",
-      path:"/deals"
-    },
-    {
-      name:"المحفظة",
-      icon:"💰",
-      path:"/wallet"
-    },
-    {
-      name:"حسابي",
-      icon:"👤",
-      path:"/profile"
-    },
-  ];
-
-
-
   return (
 
     <nav
     className="
-    mt-8
+    w-full
     bg-white
-    rounded-[30px]
-    px-4
+    rounded-t-[28px]
+    px-3
     py-3
     shadow-lg
-    border
+    border-t
     border-gray-100
-    mx-4
     "
     >
 
 
-      <div className="flex justify-around items-center">
+      <div className="
+      flex
+      items-center
+      justify-around
+      max-w-md
+      mx-auto
+      ">
 
 
 
         {/* الرئيسية */}
 
         <button
-
         onClick={()=>router.push("/deal")}
-
         className="flex flex-col items-center gap-1"
-
         >
 
           <div
           className={`
-          w-11
-          h-11
+          w-10
+          h-10
           rounded-full
           flex
           items-center
           justify-center
-          text-xl
-
+          text-lg
           ${
             pathname === "/deal"
             ?
@@ -83,7 +59,6 @@ export default function BottomNav(){
             :
             "bg-gray-100"
           }
-
           `}
           >
 
@@ -92,7 +67,7 @@ export default function BottomNav(){
           </div>
 
 
-          <span className="text-xs text-gray-600">
+          <span className="text-[11px] text-gray-600">
             الرئيسية
           </span>
 
@@ -106,32 +81,27 @@ export default function BottomNav(){
         {/* صفقاتي */}
 
         <button
-
         onClick={()=>router.push("/deals")}
-
         className="flex flex-col items-center gap-1"
-
         >
 
-          <div
-          className="
-          w-11
-          h-11
+          <div className="
+          w-10
+          h-10
           rounded-full
           bg-gray-100
           flex
           items-center
           justify-center
-          text-xl
-          "
-          >
+          text-lg
+          ">
 
           📋
 
           </div>
 
 
-          <span className="text-xs text-gray-600">
+          <span className="text-[11px] text-gray-600">
             صفقاتي
           </span>
 
@@ -143,29 +113,27 @@ export default function BottomNav(){
 
 
 
-        {/* زر الاضافة */}
+
+        {/* إنشاء صفقة */}
 
         <button
-
         onClick={()=>router.push("/deal/new")}
-
         className="
-        -mt-8
+        -mt-7
         flex
         items-center
         justify-center
         "
-
         >
 
           <div
           className="
-          w-16
-          h-16
+          w-14
+          h-14
           rounded-full
           bg-teal-700
           text-white
-          text-4xl
+          text-3xl
           flex
           items-center
           justify-center
@@ -187,35 +155,31 @@ export default function BottomNav(){
 
 
 
+
         {/* المحفظة */}
 
         <button
-
         onClick={()=>router.push("/wallet")}
-
         className="flex flex-col items-center gap-1"
-
         >
 
-          <div
-          className="
-          w-11
-          h-11
+          <div className="
+          w-10
+          h-10
           rounded-full
           bg-gray-100
           flex
           items-center
           justify-center
-          text-xl
-          "
-          >
+          text-lg
+          ">
 
           💰
 
           </div>
 
 
-          <span className="text-xs text-gray-600">
+          <span className="text-[11px] text-gray-600">
             المحفظة
           </span>
 
@@ -227,35 +191,31 @@ export default function BottomNav(){
 
 
 
+
         {/* حسابي */}
 
         <button
-
         onClick={()=>router.push("/profile")}
-
         className="flex flex-col items-center gap-1"
-
         >
 
-          <div
-          className="
-          w-11
-          h-11
+          <div className="
+          w-10
+          h-10
           rounded-full
           bg-gray-100
           flex
           items-center
           justify-center
-          text-xl
-          "
-          >
+          text-lg
+          ">
 
           👤
 
           </div>
 
 
-          <span className="text-xs text-gray-600">
+          <span className="text-[11px] text-gray-600">
             حسابي
           </span>
 
