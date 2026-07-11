@@ -3,11 +3,8 @@
 import { usePathname } from "next/navigation";
 import BottomNav from "./BottomNav";
 
-
-export default function NavigationWrapper(){
-
+export default function NavigationWrapper() {
   const pathname = usePathname();
-
 
   const hideNav = [
     "/",
@@ -16,16 +13,17 @@ export default function NavigationWrapper(){
     "/signup",
     "/terms",
     "/privacy",
+    "/how-it-works",
+    "/review",
   ];
 
-
-
-  if(hideNav.includes(pathname)){
+  if (hideNav.includes(pathname)) {
     return null;
   }
 
-
+  if (pathname.startsWith("/admin")) {
+    return null;
+  }
 
   return <BottomNav />;
-
 }

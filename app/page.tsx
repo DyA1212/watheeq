@@ -1,4 +1,71 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+type Review = {
+  id?: string;
+  name: string;
+  rating: number;
+  comment: string;
+  created_at?: string;
+};
+
 export default function Home() {
+  const [reviews, setReviews] = useState<Review[]>([]);
+
+  const defaultReviews: Review[] = [
+    {
+      name: "طيف الثقفي",
+      rating: 5,
+      comment:
+        "اشتريت حساب ببجي وكانت التجربة آمنة جدًا، المبلغ ظل محفوظ في وثيق لين تأكدت إن الحساب وصلني وكل شيء تمام.",
+    },
+    {
+      name: "حنان",
+      rating: 5,
+      comment:
+        "منصة ممتازة وتعطيني راحة وثقة عند الشراء من أشخاص ما أعرفهم.",
+    },
+    {
+      name: "رامي محمد",
+      rating: 5,
+      comment:
+        "الدعم الفني متعاون جدًا وحل مشكلتي بسرعة، أنصح الجميع باستخدام وثيق.",
+    },
+    {
+      name: "مروان أحمد",
+      rating: 5,
+      comment:
+        "أفضل منصة وساطة استخدمتها، سهلة وسريعة وتحافظ على حقوق الطرفين.",
+    },
+  ];
+
+  useEffect(() => {
+    loadReviews();
+  }, []);
+
+  async function loadReviews() {
+    const { data, error } = await supabase
+      .from("reviews")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    if (error) {
+      console.log(error);
+      return;
+    }
+
+    setReviews(data || []);
+  }
+
+  function stars(rating: number) {
+    return "⭐".repeat(Number(rating || 5));
+  }
+
+  const shownReviews = reviews.length > 0 ? reviews : defaultReviews;
+
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
 
@@ -31,6 +98,8 @@ export default function Home() {
         </div>
       </header>
 
+
+
       {/* Hero */}
       <section className="max-w-7xl mx-auto px-4 py-12 text-center">
 
@@ -62,13 +131,17 @@ export default function Home() {
         </div>
 
       </section>
-            {/* Features */}
+
+
+
+      {/* Features */}
       <section className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 px-4 pb-14">
 
         <div className="bg-white rounded-2xl shadow p-4">
           <h3 className="text-lg font-bold mb-2">
             🔒 حماية الأموال
           </h3>
+
           <p className="text-sm text-gray-600 leading-6">
             يبقى المبلغ محفوظًا حتى يؤكد المشتري استلام المنتج.
           </p>
@@ -78,6 +151,7 @@ export default function Home() {
           <h3 className="text-lg font-bold mb-2">
             ⭐ تقييم المستخدمين
           </h3>
+
           <p className="text-sm text-gray-600 leading-6">
             تقييمات حقيقية لكل بائع ومشتري بعد كل صفقة.
           </p>
@@ -87,12 +161,15 @@ export default function Home() {
           <h3 className="text-lg font-bold mb-2">
             🎧 دعم فني
           </h3>
+
           <p className="text-sm text-gray-600 leading-6">
             فريق دعم لمساعدتك في أي مشكلة أثناء الصفقة.
           </p>
         </div>
 
       </section>
+
+
 
       {/* آراء العملاء */}
       <section className="bg-white py-14">
@@ -116,47 +193,33 @@ export default function Home() {
             </a>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-            <div className="bg-gray-50 rounded-2xl shadow p-4">
-              <div className="text-xl mb-2">⭐⭐⭐⭐⭐</div>
-              <p className="text-sm text-gray-600 mb-4 leading-6">
-                تعاملت في بيع سيارة وكانت التجربة ممتازة، المبلغ ما تحول إلا بعد استلام السيارة.
-              </p>
-              <h3 className="font-bold text-sm">
-                طيف الثقفي
-              </h3>
-            </div>
+            {shownReviews.map((review, index) => (
+              <div
+                key={review.id || index}
+                className="
+                bg-gray-50
+                rounded-2xl
+                shadow
+                p-4
+                border
+                border-gray-100
+                "
+              >
+                <div className="text-xl mb-2">
+                  {stars(review.rating)}
+                </div>
 
-            <div className="bg-gray-50 rounded-2xl shadow p-4">
-              <div className="text-xl mb-2">⭐⭐⭐⭐⭐</div>
-              <p className="text-sm text-gray-600 mb-4 leading-6">
-                منصة ممتازة وتعطيني راحة وثقة عند الشراء من أشخاص ما أعرفهم.
-              </p>
-              <h3 className="font-bold text-sm">
-                جود
-              </h3>
-            </div>
+                <p className="text-sm text-gray-600 mb-4 leading-6">
+                  {review.comment}
+                </p>
 
-            <div className="bg-gray-50 rounded-2xl shadow p-4">
-              <div className="text-xl mb-2">⭐⭐⭐⭐⭐</div>
-              <p className="text-sm text-gray-600 mb-4 leading-6">
-                الدعم الفني متعاون جدًا وحل مشكلتي بسرعة، أنصح الجميع باستخدام وثيق.
-              </p>
-              <h3 className="font-bold text-sm">
-                رامي محمد
-              </h3>
-            </div>
-
-            <div className="bg-gray-50 rounded-2xl shadow p-4">
-              <div className="text-xl mb-2">⭐⭐⭐⭐⭐</div>
-              <p className="text-sm text-gray-600 mb-4 leading-6">
-                أفضل منصة وساطة استخدمتها، سهلة وسريعة وتحافظ على حقوق الطرفين.
-              </p>
-              <h3 className="font-bold text-sm">
-                مروان أحمد
-              </h3>
-            </div>
+                <h3 className="font-bold text-sm">
+                  {review.name}
+                </h3>
+              </div>
+            ))}
 
           </div>
 
