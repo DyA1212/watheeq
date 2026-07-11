@@ -22,11 +22,13 @@ export default function WalletPage() {
 
   const [balance, setBalance] = useState(0);
   const [frozen, setFrozen] = useState(0);
+  const [pendingTransfer, setPendingTransfer] = useState(0);
   const [transferred, setTransferred] = useState(0);
 
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   const [showBankForm, setShowBankForm] = useState(false);
 
@@ -58,7 +60,7 @@ export default function WalletPage() {
 
     if (type === "pending") {
       alert(
-        "قيد التحويل هو المبلغ الذي طلبت سحبه إلى حسابك البنكي، لكنه لم يكتمل تحويله بعد من الإدارة."
+        "قيد التحويل هو المبلغ الذي طلبت سحبه إلى حسابك البنكي. يتم مراجعته وتحويله خلال ٢٤ ساعة."
       );
     }
 
@@ -95,6 +97,7 @@ export default function WalletPage() {
 
       setBalance(Number(data.balance || 0));
       setFrozen(Number(data.frozen_balance || 0));
+      setPendingTransfer(Number(data.pending_transfer_balance || 0));
       setTransferred(Number(data.transferred_balance || 0));
     }
 
@@ -153,6 +156,7 @@ export default function WalletPage() {
           account_number: accountNumber,
           balance: 0,
           frozen_balance: 0,
+          pending_transfer_balance: 0,
           transferred_balance: 0,
         },
       ]);
@@ -170,13 +174,48 @@ export default function WalletPage() {
     loadWallet();
   }
 
-  function withdraw() {
+  async function withdraw() {
+    const userId = sessionStorage.getItem("user_id");
+
+    if (!userId) {
+      alert("يجب تسجيل الدخول");
+      return;
+    }
+
     if (balance <= 0) {
       alert("لا يوجد رصيد متاح للسحب");
       return;
     }
 
-    router.push("/withdraw");
+    const confirmWithdraw = confirm(
+      `هل تريد طلب سحب مبلغ ${money(balance)} ر.س؟`
+    );
+
+    if (!confirmWithdraw) return;
+
+    setWithdrawing(true);
+
+    const newPendingTransfer = Number(pendingTransfer || 0) + Number(balance);
+
+    const { error } = await supabase
+      .from("wallets")
+      .update({
+        balance: 0,
+        pending_transfer_balance: newPendingTransfer,
+      })
+      .eq("user_id", userId);
+
+    setWithdrawing(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setBalance(0);
+    setPendingTransfer(newPendingTransfer);
+
+    alert("تم إرسال طلب السحب ✅ سوف يتم السحب خلال ٢٤ ساعة");
   }
 
   return (
@@ -257,8 +296,11 @@ export default function WalletPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={withdraw}
+                  disabled={withdrawing || balance <= 0}
                   className="
                   bg-gray-400
+                  disabled:bg-gray-300
+                  disabled:text-gray-500
                   text-white
                   rounded-2xl
                   py-4
@@ -268,7 +310,7 @@ export default function WalletPage() {
                   transition
                   "
                 >
-                  سحب الرصيد
+                  {withdrawing ? "جاري الطلب..." : "سحب الرصيد"}
                 </button>
 
                 <button
@@ -405,7 +447,7 @@ export default function WalletPage() {
                 </p>
 
                 <h3 className="text-2xl font-bold text-gray-900 mt-1">
-                  {money(0)} ر.س
+                  {money(pendingTransfer)} ر.س
                 </h3>
               </div>
 
