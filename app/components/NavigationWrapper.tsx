@@ -15,6 +15,9 @@ export default function NavigationWrapper() {
     "/privacy",
     "/how-it-works",
     "/review",
+    "/forgot-password",
+    "/reset-password",
+    "/verify-email",
   ];
 
   if (hideNav.includes(pathname)) {
