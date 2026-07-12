@@ -19,8 +19,6 @@ type Deal = {
   paid_at?: string | null;
 };
 
-type PaymentMethod = "creditcard" | "applepay";
-
 declare global {
   interface Window {
     Moyasar?: {
@@ -43,7 +41,6 @@ export default function PaymentPage() {
   const [pageError, setPageError] = useState("");
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [formError, setFormError] = useState("");
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [verifiedPaymentId, setVerifiedPaymentId] = useState("");
@@ -165,12 +162,15 @@ export default function PaymentPage() {
 
   useEffect(() => {
     if (!showPaymentForm) return;
-    if (!paymentMethod) return;
     if (!deal) return;
     if (deal.status !== "pending") return;
 
-    initMoyasarForm(paymentMethod);
-  }, [showPaymentForm, paymentMethod, deal?.id]);
+    const timer = setTimeout(() => {
+      initMoyasarForm();
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [showPaymentForm, deal?.id]);
 
   function money(value?: number | string) {
     return Number(value || 0).toLocaleString("ar-SA");
@@ -223,24 +223,30 @@ export default function PaymentPage() {
     });
   }
 
-  async function initMoyasarForm(method: PaymentMethod) {
+  async function initMoyasarForm() {
     if (!deal) return;
 
     setFormError("");
 
     try {
-      const publishableKey =
-        process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY;
+      const publishableKey = (
+        process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY || ""
+      ).trim();
 
       if (!publishableKey) {
-        throw new Error(
-          "ناقص مفتاح Moyasar. أضف NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY في .env.local"
-        );
+        throw new Error("مفتاح الدفع العام غير موجود في ملف .env.local");
+      }
+
+      if (
+        !publishableKey.startsWith("pk_test_") &&
+        !publishableKey.startsWith("pk_live_")
+      ) {
+        throw new Error("مفتاح الدفع العام غير صحيح. لازم يبدأ بـ pk_test_");
       }
 
       await loadMoyasarAssets();
 
-      const formElement = document.getElementById("moyasar-form");
+      const formElement = document.querySelector(".mysr-form");
 
       if (!formElement) {
         throw new Error("تعذر تجهيز نموذج الدفع");
@@ -256,15 +262,15 @@ export default function PaymentPage() {
 
       const currentUserId = sessionStorage.getItem("user_id") || "";
 
-      const baseConfig: Record<string, any> = {
-        element: "#moyasar-form",
+      window.Moyasar?.init({
+        element: ".mysr-form",
         amount: amountInHalalas,
         currency: "SAR",
         description: `Watheeq deal ${deal.id}`,
         publishable_api_key: publishableKey,
         callback_url: `${window.location.origin}/deal/pay/${deal.id}`,
         supported_networks: ["mada", "visa", "mastercard"],
-        methods: [method],
+        methods: ["creditcard"],
         language: "ar",
         fixed_width: false,
         metadata: {
@@ -280,18 +286,23 @@ export default function PaymentPage() {
         on_failure: async function (error: string) {
           setFormError(error || "فشلت عملية الدفع");
         },
-      };
+      });
 
-      if (method === "applepay") {
-        baseConfig.apple_pay = {
-          country: "SA",
-          label: "وثيق",
-          validate_merchant_url:
-            "https://api.moyasar.com/v1/applepay/initiate",
-        };
-      }
+      setTimeout(() => {
+        const form = document.querySelector(".mysr-form");
 
-      window.Moyasar?.init(baseConfig);
+        if (!form) return;
+
+        const text = form.textContent || "";
+        const stillLoading = text.toLowerCase().includes("loading");
+        const hasInput = form.querySelector("input");
+
+        if (stillLoading && !hasInput) {
+          setFormError(
+            "نموذج الدفع تأخر في التحميل. حدث الصفحة وجرب بطاقة / مدى مرة ثانية."
+          );
+        }
+      }, 12000);
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "حدث خطأ في نموذج الدفع";
@@ -300,10 +311,15 @@ export default function PaymentPage() {
     }
   }
 
-  function openPayment(method: PaymentMethod) {
-    setPaymentMethod(method);
+  function openCardPayment() {
     setShowPaymentForm(true);
     setFormError("");
+  }
+
+  function openApplePay() {
+    alert(
+      "Apple Pay يحتاج تفعيل على الدومين الحقيقي من بوابة الدفع. جرّب الآن بطاقة / مدى أولاً."
+    );
   }
 
   async function verifyPayment(paymentId: string) {
@@ -343,13 +359,8 @@ export default function PaymentPage() {
 
       setDeal(result.deal);
       setShowPaymentForm(false);
-      setPaymentMethod(null);
 
-      window.history.replaceState(
-        null,
-        "",
-        `/deal/pay/${deal.id}`
-      );
+      window.history.replaceState(null, "", `/deal/pay/${deal.id}`);
 
       alert("تم الدفع بنجاح ✅");
     } catch (error: unknown) {
@@ -623,8 +634,8 @@ export default function PaymentPage() {
           {moyasarPaymentId && deal.status === "pending" && (
             <div className="bg-blue-50 text-blue-700 p-4 rounded-2xl text-center font-bold leading-7">
               {verifyingPayment
-                ? "جاري التحقق من الدفع الحقيقي..."
-                : "تم الرجوع من بوابة الدفع، اضغط تحقق إذا لم تتحدث الحالة."}
+                ? "جاري التحقق من الدفع..."
+                : "تم الرجوع من صفحة الدفع، انتظر تحديث الحالة."}
             </div>
           )}
 
@@ -632,14 +643,13 @@ export default function PaymentPage() {
             <div className="space-y-4">
               {!showPaymentForm && (
                 <>
-                  <div className="bg-yellow-50 text-yellow-800 rounded-2xl p-4 text-sm leading-7">
-                    اختر طريقة الدفع. بيانات البطاقة لا تُحفظ في وثيق،
-                    الدفع يتم عن طريق بوابة Moyasar.
+                  <div className="bg-yellow-50 text-yellow-800 rounded-2xl p-4 text-sm leading-7 text-center">
+                    اختر طريقة الدفع المناسبة لك
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => openPayment("applepay")}
+                    onClick={openApplePay}
                     disabled={loading || verifyingPayment}
                     className="
                     w-full
@@ -660,7 +670,7 @@ export default function PaymentPage() {
 
                   <button
                     type="button"
-                    onClick={() => openPayment("creditcard")}
+                    onClick={openCardPayment}
                     disabled={loading || verifyingPayment}
                     className="
                     w-full
@@ -685,16 +695,13 @@ export default function PaymentPage() {
                 <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4">
                   <div className="flex items-center justify-between gap-3 mb-4">
                     <h2 className="font-bold text-gray-900">
-                      {paymentMethod === "applepay"
-                        ? "الدفع عبر Apple Pay"
-                        : "الدفع بالبطاقة / مدى"}
+                      الدفع بالبطاقة / مدى
                     </h2>
 
                     <button
                       type="button"
                       onClick={() => {
                         setShowPaymentForm(false);
-                        setPaymentMethod(null);
                         setFormError("");
                       }}
                       className="bg-white text-gray-700 px-4 py-2 rounded-2xl font-bold text-sm"
@@ -704,12 +711,12 @@ export default function PaymentPage() {
                   </div>
 
                   {formError && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-2xl mb-4 text-sm font-bold leading-6">
+                    <div className="bg-red-50 text-red-600 p-3 rounded-2xl mb-4 text-sm font-bold leading-6 text-center">
                       {formError}
                     </div>
                   )}
 
-                  <div id="moyasar-form" />
+                  <div className="mysr-form" />
 
                   {verifyingPayment && (
                     <p className="text-center text-teal-700 font-bold mt-4">
