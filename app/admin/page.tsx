@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+const ADMIN_EMAIL = "deaabd89@gmail.com";
+
 type AdminTab = "home" | "users" | "deals" | "reports" | "transfers";
 
 type User = {
@@ -12,7 +14,6 @@ type User = {
   name?: string;
   email?: string;
   phone?: string;
-  password?: string;
   created_at?: string;
 };
 
@@ -51,8 +52,9 @@ export default function AdminPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
-  const [passwordInputs, setPasswordInputs] = useState<Record<string, string>>({});
-  const [savingPasswordId, setSavingPasswordId] = useState("");
+  const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
+  const [changingPasswordId, setChangingPasswordId] = useState("");
+
   const [updatingDealId, setUpdatingDealId] = useState("");
   const [transferringId, setTransferringId] = useState("");
 
@@ -69,14 +71,28 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    const role = sessionStorage.getItem("role");
+    async function protectAdminPage() {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
 
-    if (role !== "admin") {
-      router.push("/deal");
-      return;
+      const currentEmail = user?.email?.trim().toLowerCase();
+
+      if (error || !user || currentEmail !== ADMIN_EMAIL) {
+        sessionStorage.setItem("role", "user");
+        router.replace("/deal");
+        return;
+      }
+
+      sessionStorage.setItem("role", "admin");
+      sessionStorage.setItem("email", currentEmail);
+      sessionStorage.setItem("user_id", user.id);
+
+      await loadData();
     }
 
-    loadData();
+    protectAdminPage();
   }, [router]);
 
   function money(value: number | string | null | undefined) {
@@ -130,7 +146,7 @@ export default function AdminPage() {
 
     const { data: usersData } = await supabase
       .from("users")
-      .select("*")
+      .select("id, name, email, phone, created_at")
       .order("created_at", { ascending: false });
 
     const { data: dealsData } = await supabase
@@ -146,12 +162,6 @@ export default function AdminPage() {
     const safeUsers = (usersData || []) as User[];
     const safeDeals = (dealsData || []) as Deal[];
     const safeWallets = (walletsData || []) as Wallet[];
-
-    const passwords: Record<string, string> = {};
-
-    safeUsers.forEach((user) => {
-      passwords[user.id] = user.password || "";
-    });
 
     const commission =
       safeDeals.reduce(
@@ -176,7 +186,6 @@ export default function AdminPage() {
     setUsers(safeUsers);
     setDeals(safeDeals);
     setWallets(safeWallets);
-    setPasswordInputs(passwords);
 
     setStats({
       users: safeUsers.length,
@@ -201,40 +210,65 @@ export default function AdminPage() {
     setLoading(false);
   }
 
-  async function saveUserPassword(user: User) {
-    const newPassword = (passwordInputs[user.id] || "").trim();
+  async function changeUserPassword(user: User) {
+    const newPassword = (newPasswords[user.id] || "").trim();
 
-    if (!newPassword) {
-      alert("اكتب كلمة السر أولاً");
+    if (newPassword.length < 8) {
+      alert("كلمة المرور الجديدة لازم تكون 8 أحرف أو أكثر");
       return;
     }
 
-    const confirmSave = confirm(
-      `هل تريد تعديل كلمة سر المستخدم ${
+    const confirmed = window.confirm(
+      `هل تريد تعيين كلمة مرور جديدة للمستخدم ${
         user.name || user.email || "بدون اسم"
       }؟`
     );
 
-    if (!confirmSave) return;
+    if (!confirmed) return;
 
-    setSavingPasswordId(user.id);
+    setChangingPasswordId(user.id);
 
-    const { error } = await supabase
-      .from("users")
-      .update({
-        password: newPassword,
-      })
-      .eq("id", user.id);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    setSavingPasswordId("");
+      if (!session?.access_token) {
+        alert("انتهت جلسة الأدمن، سجل الدخول مرة ثانية");
+        router.replace("/login");
+        return;
+      }
 
-    if (error) {
-      alert(error.message);
-      return;
+      const response = await fetch("/api/admin/users/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          newPassword,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result?.error || "تعذر تغيير كلمة المرور");
+        return;
+      }
+
+      setNewPasswords((current) => ({
+        ...current,
+        [user.id]: "",
+      }));
+
+      alert("تم تغيير كلمة المرور بنجاح ✅");
+    } catch {
+      alert("حدث خطأ أثناء تغيير كلمة المرور");
+    } finally {
+      setChangingPasswordId("");
     }
-
-    alert("تم تعديل كلمة السر ✅");
-    loadData();
   }
 
   async function updateDealStatus(
@@ -414,10 +448,30 @@ export default function AdminPage() {
           mb-5
           "
         >
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-            <div>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/deal")}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/20"
+              >
+                <span>→</span>
+                الرجوع للرئيسية
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/profile")}
+                className="rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/20"
+              >
+                حسابي
+              </button>
+            </div>
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+              <div>
               <p className="text-teal-100 text-sm font-bold">
-                وثيق Admin
+                إدارة وثيق
               </p>
 
               <h1 className="text-3xl md:text-5xl font-bold mt-2">
@@ -446,6 +500,7 @@ export default function AdminPage() {
                 {money(stats.commission)} ر.س
               </h2>
             </div>
+          </div>
           </div>
         </header>
 
@@ -680,41 +735,37 @@ export default function AdminPage() {
                             </span>
                           </p>
 
-                          <div>
-                            <label className="block font-bold text-gray-700 mb-2">
-                              كلمة السر
+                          <div className="pt-2">
+                            <label className="mb-2 block font-bold text-gray-700">
+                              تعيين كلمة مرور جديدة
                             </label>
 
                             <input
-                              value={passwordInputs[user.id] || ""}
-                              onChange={(e) =>
-                                setPasswordInputs({
-                                  ...passwordInputs,
-                                  [user.id]: e.target.value,
-                                })
+                              type="password"
+                              value={newPasswords[user.id] || ""}
+                              onChange={(event) =>
+                                setNewPasswords((current) => ({
+                                  ...current,
+                                  [user.id]: event.target.value,
+                                }))
                               }
-                              className="w-full rounded-2xl p-3"
-                              placeholder="كلمة السر"
+                              placeholder="8 أحرف أو أكثر"
+                              className="w-full rounded-2xl border border-gray-300 p-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                              dir="ltr"
                             />
                           </div>
 
                           <button
-                            onClick={() => saveUserPassword(user)}
-                            disabled={savingPasswordId === user.id}
-                            className="
-                            w-full
-                            bg-teal-700
-                            text-white
-                            py-3
-                            rounded-2xl
-                            font-bold
-                            disabled:opacity-60
-                            "
+                            type="button"
+                            onClick={() => changeUserPassword(user)}
+                            disabled={changingPasswordId === user.id}
+                            className="w-full rounded-2xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {savingPasswordId === user.id
-                              ? "جاري الحفظ..."
-                              : "حفظ كلمة السر"}
+                            {changingPasswordId === user.id
+                              ? "جاري التغيير..."
+                              : "تغيير كلمة المرور"}
                           </button>
+
                         </div>
                       </div>
                     ))}

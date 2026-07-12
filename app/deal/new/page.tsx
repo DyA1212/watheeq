@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function DealPage() {
-
   const router = useRouter();
 
   const [role, setRole] = useState<"" | "seller" | "buyer">("");
@@ -13,244 +12,278 @@ export default function DealPage() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<FileList | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const commission = amount ? Number(amount) * 0.10 : 0;
-  const sellerAmount = amount ? Number(amount) - commission : 0;
+  const numericAmount = Number(amount) || 0;
+  const commission = numericAmount * 0.1;
+  const sellerAmount = numericAmount - commission;
 
-  async function addAdminProfit() {
-
-    console.log("بدأ تحديث أرباح الإدارة");
-
-    const { data: wallet, error } = await supabase
-      .from("admin_wallet")
-      .select("*")
-      .eq("id", 1)
-      .maybeSingle();
-
-    if (error) {
-      console.log("خطأ قراءة المحفظة:", error);
+  async function createDeal() {
+    if (loading) {
       return;
     }
 
-    if (wallet) {
-
-      const { error: updateError } = await supabase
-        .from("admin_wallet")
-        .update({
-          total_profit:
-            Number(wallet.total_profit) + Number(commission),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", 1);
-
-      console.log("نتيجة التحديث:", updateError);
-
-    } else {
-
-      const { error: insertError } = await supabase
-        .from("admin_wallet")
-        .insert([
-          {
-            id: 1,
-            total_profit: Number(commission),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
-
-      console.log("نتيجة الإنشاء:", insertError);
-
-    }
-
-  }async function createDeal() {
-
-  if (role === "") {
-    alert("اختر هل أنت بائع أو مشتري");
-    return;
-  }
-
-  if (role === "seller") {
-
-    if (!amount || !description) {
-      alert("يرجى تعبئة جميع البيانات");
+    if (role === "") {
+      alert("اختر هل أنت بائع أو مشتري");
       return;
     }
 
-    if (!images || images.length === 0) {
-      alert("يرجى رفع صورة واحدة على الأقل");
-      return;
-    }
+    if (role === "seller") {
+      if (!amount || !description.trim()) {
+        alert("يرجى تعبئة جميع البيانات");
+        return;
+      }
 
-    if (images.length > 10) {
-      alert("الحد الأقصى 10 صور");
-      return;
-    }
+      if (!images || images.length === 0) {
+        alert("يرجى رفع صورة واحدة على الأقل");
+        return;
+      }
 
-    const userId = sessionStorage.getItem("user_id");
+      if (images.length > 10) {
+        alert("الحد الأقصى 10 صور");
+        return;
+      }
 
-    if (!userId) {
-      alert("لم يتم العثور على حساب المستخدم");
-      return;
-    }
+      const cleanAmount = Number(amount);
 
-    const { data, error } = await supabase
-      .from("deals")
-      .insert([
-        {
-          role: "seller",
-          seller_id: userId,
-          amount: Number(amount),
-          description,
-          commission: Number(commission),
-          seller_amount: Number(sellerAmount),
-          status: "pending",
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select()
-      .single();
+      if (!Number.isFinite(cleanAmount) || cleanAmount <= 0) {
+        alert("سعر المنتج غير صحيح");
+        return;
+      }
 
-    if (error) {
-      console.log(error);
-      alert(error.message);
-      return;
-    }
+      setLoading(true);
 
-    // تحديث أرباح الإدارة
-    await addAdminProfit();
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-    const paymentLink =
-      `${window.location.origin}/deal/pay/${data.id}`;
+        if (userError || !user) {
+          alert("انتهت جلسة تسجيل الدخول، سجل الدخول مرة ثانية");
+          router.push("/login");
+          return;
+        }
 
-    await navigator.clipboard.writeText(paymentLink);
+        const calculatedCommission = cleanAmount * 0.1;
+        const calculatedSellerAmount =
+          cleanAmount - calculatedCommission;
 
-    alert(
-      `تم إنشاء الصفقة بنجاح ✅
+        const { data, error } = await supabase
+          .from("deals")
+          .insert([
+            {
+              role: "seller",
+              seller_id: user.id,
+              user_id: user.id,
+              amount: cleanAmount,
+              description: description.trim(),
+              commission: calculatedCommission,
+              seller_amount: calculatedSellerAmount,
+              status: "pending",
+              buyer_confirmed: false,
+              created_at: new Date().toISOString(),
+            },
+          ])
+          .select()
+          .single();
+
+        if (error) {
+          console.error("خطأ إنشاء الصفقة:", error);
+          alert(`تعذر إنشاء الصفقة: ${error.message}`);
+          return;
+        }
+
+        if (!data?.id) {
+          alert("تم إنشاء الصفقة، لكن تعذر الحصول على رابطها");
+          return;
+        }
+
+        const paymentLink = `${window.location.origin}/deal/pay/${data.id}`;
+
+        let copied = false;
+
+        try {
+          await navigator.clipboard.writeText(paymentLink);
+          copied = true;
+        } catch (copyError) {
+          console.error("تعذر نسخ الرابط:", copyError);
+        }
+
+        alert(
+          copied
+            ? `تم إنشاء الصفقة بنجاح ✅
 
 رابط الدفع:
 ${paymentLink}
 
 تم نسخ الرابط`
-    );
+            : `تم إنشاء الصفقة بنجاح ✅
 
-    router.push("/deals");
-    return;
-  }
+رابط الدفع:
+${paymentLink}
 
-  if (role === "buyer") {
+انسخ الرابط وأرسله للمشتري`
+        );
 
-    if (!dealLink.trim()) {
-      alert("أدخل رابط الصفقة");
+        router.push("/deals");
+      } catch (error) {
+        console.error("خطأ غير متوقع:", error);
+        alert("حدث خطأ غير متوقع، حاول مرة ثانية");
+      } finally {
+        setLoading(false);
+      }
+
       return;
     }
 
-    const dealId = dealLink.split("/").pop();
+    if (role === "buyer") {
+      const cleanLink = dealLink.trim();
 
-    router.push(`/deal/pay/${dealId}`);
+      if (!cleanLink) {
+        alert("أدخل رابط الصفقة");
+        return;
+      }
+
+      try {
+        const url = new URL(cleanLink);
+        const parts = url.pathname.split("/").filter(Boolean);
+        const dealId = parts[parts.length - 1];
+
+        if (!dealId) {
+          alert("رابط الصفقة غير صحيح");
+          return;
+        }
+
+        router.push(`/deal/pay/${dealId}`);
+      } catch {
+        const parts = cleanLink.split("/").filter(Boolean);
+        const dealId = parts[parts.length - 1];
+
+        if (!dealId) {
+          alert("رابط الصفقة غير صحيح");
+          return;
+        }
+
+        router.push(`/deal/pay/${dealId}`);
+      }
+    }
   }
 
-}return (
-  <main className="min-h-screen bg-gray-100 flex justify-center items-center p-6">
-    <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-xl">
+  return (
+    <main className="min-h-screen bg-gray-100 flex justify-center items-center p-4 sm:p-6">
+      <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-xl">
+        <h1 className="text-2xl sm:text-3xl font-bold text-center text-teal-700 mb-2">
+          إنشاء صفقة جديدة
+        </h1>
 
-      <h1 className="text-3xl font-bold text-center text-teal-700 mb-2">
-        إنشاء صفقة جديدة
-      </h1>
+        <p className="text-center text-gray-500 mb-8">
+          اختر دورك في الصفقة
+        </p>
 
-      <p className="text-center text-gray-500 mb-8">
-        اختر دورك في الصفقة
-      </p>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
+          <button
+            type="button"
+            onClick={() => setRole("seller")}
+            disabled={loading}
+            className={`rounded-xl p-4 border font-bold transition disabled:opacity-60 ${
+              role === "seller"
+                ? "bg-teal-700 border-teal-700 text-white"
+                : "bg-white border-gray-300 text-gray-800 hover:border-teal-600"
+            }`}
+          >
+            🏷️ أنا بائع
+          </button>
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
+          <button
+            type="button"
+            onClick={() => setRole("buyer")}
+            disabled={loading}
+            className={`rounded-xl p-4 border font-bold transition disabled:opacity-60 ${
+              role === "buyer"
+                ? "bg-teal-700 border-teal-700 text-white"
+                : "bg-white border-gray-300 text-gray-800 hover:border-teal-600"
+            }`}
+          >
+            🛒 أنا مشتري
+          </button>
+        </div>
+
+        {role === "seller" && (
+          <>
+            <label className="block mb-2 font-semibold text-gray-700">
+              صور المنتج
+            </label>
+
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={loading}
+              onChange={(e) => setImages(e.target.files)}
+              className="w-full border border-gray-300 rounded-xl p-3 mb-4 disabled:bg-gray-100"
+            />
+
+            <p className="text-xs text-gray-500 mb-4">
+              يمكنك اختيار من صورة واحدة إلى 10 صور
+            </p>
+
+            <textarea
+              placeholder="اكتب وصفًا دقيقًا للمنتج"
+              value={description}
+              disabled={loading}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl p-3 mb-4 h-32 resize-none outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:bg-gray-100"
+            />
+
+            <input
+              type="number"
+              inputMode="decimal"
+              min="1"
+              step="0.01"
+              placeholder="سعر المنتج (ريال)"
+              value={amount}
+              disabled={loading}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl p-3 mb-4 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:bg-gray-100"
+            />
+
+            {numericAmount > 0 && (
+              <div className="bg-gray-100 rounded-xl p-4 mb-6">
+                <p className="text-gray-700">
+                  عمولة وثيق:
+                  <b> {commission.toFixed(2)} ر.س (10%)</b>
+                </p>
+
+                <p className="text-green-700 font-bold mt-2">
+                  سيصل للبائع: {sellerAmount.toFixed(2)} ر.س
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {role === "buyer" && (
+          <input
+            type="text"
+            placeholder="الصق رابط الصفقة هنا"
+            value={dealLink}
+            disabled={loading}
+            onChange={(e) => setDealLink(e.target.value)}
+            className="w-full border border-gray-300 rounded-xl p-3 mb-6 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:bg-gray-100"
+            dir="ltr"
+          />
+        )}
 
         <button
-          onClick={() => setRole("seller")}
-          className={`rounded-xl p-4 border font-bold ${
-            role === "seller"
-              ? "bg-teal-700 text-white"
-              : "bg-white"
-          }`}
+          type="button"
+          onClick={createDeal}
+          disabled={loading}
+          className="w-full bg-teal-700 hover:bg-teal-800 text-white py-4 rounded-xl font-bold text-lg transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          🏷️ أنا بائع
+          {loading ? "جاري إنشاء الصفقة..." : "متابعة"}
         </button>
-
-        <button
-          onClick={() => setRole("buyer")}
-          className={`rounded-xl p-4 border font-bold ${
-            role === "buyer"
-              ? "bg-teal-700 text-white"
-              : "bg-white"
-          }`}
-        >
-          🛒 أنا مشتري
-        </button>
-
       </div>
-
-      {role === "seller" && (
-        <>
-
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => setImages(e.target.files)}
-            className="w-full border rounded-xl p-3 mb-3"
-          />
-
-          <textarea
-            placeholder="اكتب وصفاً دقيقاً للمنتج"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full border rounded-xl p-3 mb-4 h-32"
-          />
-
-          <input
-            type="number"
-            placeholder="سعر المنتج (ريال)"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full border rounded-xl p-3 mb-4"
-          />
-
-          {amount && (
-            <div className="bg-gray-100 rounded-xl p-4 mb-6">
-
-              <p>
-                عمولة وثيق:
-                <b> {commission.toFixed(2)} ر.س (10%)</b>
-              </p>
-
-              <p className="text-green-700 font-bold mt-2">
-                سيصل للبائع:
-                {" "}
-                {sellerAmount.toFixed(2)} ر.س
-              </p>
-
-            </div>
-          )}
-
-        </>
-      )}
-
-      {role === "buyer" && (
-        <input
-          type="text"
-          placeholder="الصق رابط الصفقة هنا"
-          value={dealLink}
-          onChange={(e) => setDealLink(e.target.value)}
-          className="w-full border rounded-xl p-3 mb-6"
-        />
-      )}
-
-      <button
-        onClick={createDeal}
-        className="w-full bg-teal-700 hover:bg-teal-800 text-white py-4 rounded-xl font-bold text-lg"
-      >
-        متابعة
-      </button>
-
-    </div>
-  </main>
-);
-
+    </main>
+  );
 }
