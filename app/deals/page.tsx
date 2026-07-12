@@ -404,23 +404,6 @@ export default function DealsPage() {
                   </button>
                 )}
 
-
-
-                <button
-                  onClick={() => router.push(`/deal/pay/${deal.id}`)}
-                  className="
-                  mt-3
-                  w-full
-                  py-3
-                  rounded-2xl
-                  bg-gray-900
-                  text-white
-                  font-bold
-                  "
-                >
-                  عرض التفاصيل
-                </button>
-
               </div>
             ))}
 

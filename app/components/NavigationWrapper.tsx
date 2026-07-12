@@ -25,5 +25,13 @@ export default function NavigationWrapper() {
     return null;
   }
 
+  if (pathname.startsWith("/deal/pay")) {
+    return null;
+  }
+
+  if (pathname.startsWith("/support")) {
+    return null;
+  }
+
   return <BottomNav />;
 }
