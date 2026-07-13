@@ -9,52 +9,109 @@ const ADMIN_EMAIL = "deaabd89@gmail.com";
 export default function ProfilePage() {
   const router = useRouter();
 
+  const [userId, setUserId] = useState("");
   const [name, setName] = useState("مستخدم");
   const [phone, setPhone] = useState("");
   const [image, setImage] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
-      const savedName =
-        sessionStorage.getItem("name") ||
-        localStorage.getItem("name");
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
-      const savedPhone =
-        sessionStorage.getItem("phone") ||
-        localStorage.getItem("phone");
+        if (error || !user) {
+          sessionStorage.clear();
+          router.replace("/login");
+          return;
+        }
 
-      const savedImage =
-        sessionStorage.getItem("profile_image") ||
-        localStorage.getItem("profile_image");
+        const currentUserId = user.id;
+        const currentEmail =
+          user.email?.trim().toLowerCase() || "";
 
-      if (savedName) setName(savedName);
-      if (savedPhone) setPhone(savedPhone);
-      if (savedImage) setImage(savedImage);
+        setUserId(currentUserId);
+        setIsAdmin(currentEmail === ADMIN_EMAIL);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        /*
+          كل بيانات المستخدم محفوظة بمفتاح يحتوي user.id
+          حتى لا تختلط بيانات الحسابات مع بعضها.
+        */
+        const savedName = localStorage.getItem(
+          `name_${currentUserId}`
+        );
 
-      if (!user) {
+        const savedPhone = localStorage.getItem(
+          `phone_${currentUserId}`
+        );
+
+        const savedImage = localStorage.getItem(
+          `profile_image_${currentUserId}`
+        );
+
+        const profileName = String(
+          savedName ||
+            user.user_metadata?.name ||
+            "مستخدم"
+        );
+
+        const profilePhone = String(
+          savedPhone ||
+            user.user_metadata?.phone ||
+            ""
+        );
+
+        setName(profileName);
+        setPhone(profilePhone);
+        setImage(savedImage || "");
+
+        /*
+          sessionStorage يحتوي بيانات الحساب المفتوح حاليًا فقط.
+        */
+        sessionStorage.setItem("user_id", currentUserId);
+        sessionStorage.setItem("email", currentEmail);
+        sessionStorage.setItem("name", profileName);
+        sessionStorage.setItem("phone", profilePhone);
+        sessionStorage.setItem(
+          "role",
+          currentEmail === ADMIN_EMAIL ? "admin" : "user"
+        );
+
+        if (savedImage) {
+          sessionStorage.setItem(
+            "profile_image",
+            savedImage
+          );
+        } else {
+          sessionStorage.removeItem("profile_image");
+        }
+
+        /*
+          حذف المفاتيح القديمة المشتركة بين الحسابات.
+        */
+        localStorage.removeItem("name");
+        localStorage.removeItem("phone");
+        localStorage.removeItem("profile_image");
+      } catch {
         router.replace("/login");
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      const currentEmail = user.email?.trim().toLowerCase() || "";
-      const adminAccount = currentEmail === ADMIN_EMAIL;
-
-      setIsAdmin(adminAccount);
-
-      sessionStorage.setItem("email", currentEmail);
-      sessionStorage.setItem("user_id", user.id);
-      sessionStorage.setItem("role", adminAccount ? "admin" : "user");
     }
 
     loadProfile();
   }, [router]);
 
-  function saveData() {
+  async function saveData() {
+    if (!userId || saving) {
+      return;
+    }
+
     const cleanName = name.trim();
     const cleanPhone = phone.trim();
 
@@ -63,49 +120,88 @@ export default function ProfilePage() {
       return;
     }
 
-    if (cleanPhone && !/^05[0-9]{8}$/.test(cleanPhone)) {
+    if (
+      cleanPhone &&
+      !/^05[0-9]{8}$/.test(cleanPhone)
+    ) {
       alert("رقم الجوال غير صحيح مثال: 0512345678");
       return;
     }
 
-    sessionStorage.setItem("name", cleanName);
-    sessionStorage.setItem("phone", cleanPhone);
-    localStorage.setItem("name", cleanName);
-    localStorage.setItem("phone", cleanPhone);
+    setSaving(true);
 
-    if (image) {
-      sessionStorage.setItem("profile_image", image);
-      localStorage.setItem("profile_image", image);
+    try {
+      /*
+        تحديث بيانات المستخدم داخل Supabase Auth.
+        هذا يخلي الاسم والجوال مرتبطين بالحساب.
+      */
+      const { error } =
+        await supabase.auth.updateUser({
+          data: {
+            name: cleanName,
+            phone: cleanPhone,
+          },
+        });
+
+      if (error) {
+        alert("تعذر حفظ البيانات، حاول مرة ثانية");
+        return;
+      }
+
+      /*
+        تخزين خاص بكل مستخدم باستخدام user.id.
+      */
+      localStorage.setItem(
+        `name_${userId}`,
+        cleanName
+      );
+
+      localStorage.setItem(
+        `phone_${userId}`,
+        cleanPhone
+      );
+
+      if (image) {
+        localStorage.setItem(
+          `profile_image_${userId}`,
+          image
+        );
+      } else {
+        localStorage.removeItem(
+          `profile_image_${userId}`
+        );
+      }
+
+      /*
+        تحديث بيانات الجلسة الحالية للعرض في باقي الصفحات.
+      */
+      sessionStorage.setItem("name", cleanName);
+      sessionStorage.setItem("phone", cleanPhone);
+
+      if (image) {
+        sessionStorage.setItem(
+          "profile_image",
+          image
+        );
+      } else {
+        sessionStorage.removeItem("profile_image");
+      }
+
+      setName(cleanName);
+      setPhone(cleanPhone);
+
+      alert("تم حفظ البيانات ✅");
+    } catch {
+      alert("حدث خطأ أثناء حفظ البيانات");
+    } finally {
+      setSaving(false);
     }
-
-    alert("تم حفظ البيانات ✅");
-  }
-
-  async function deleteAccount() {
-    const confirmDelete = window.confirm(
-      "هل أنت متأكد من حذف بيانات الحساب من هذا الجهاز؟"
-    );
-
-    if (!confirmDelete) return;
-
-    sessionStorage.clear();
-    localStorage.removeItem("name");
-    localStorage.removeItem("phone");
-    localStorage.removeItem("email");
-    localStorage.removeItem("user_id");
-    localStorage.removeItem("role");
-    localStorage.removeItem("profile_image");
-    localStorage.removeItem("admin");
-    localStorage.removeItem("isAdmin");
-
-    await supabase.auth.signOut();
-
-    alert("تم تسجيل الخروج وحذف البيانات المحفوظة من الجهاز");
-    router.replace("/signup");
   }
 
   function changeProfileImage(file?: File) {
-    if (!file) return;
+    if (!file || !userId) {
+      return;
+    }
 
     if (!file.type.startsWith("image/")) {
       alert("اختر صورة صحيحة");
@@ -120,21 +216,116 @@ export default function ProfilePage() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      const imageBase64 = reader.result as string;
+      const imageBase64 = String(reader.result || "");
+
       setImage(imageBase64);
-      sessionStorage.setItem("profile_image", imageBase64);
-      localStorage.setItem("profile_image", imageBase64);
+
+      localStorage.setItem(
+        `profile_image_${userId}`,
+        imageBase64
+      );
+
+      sessionStorage.setItem(
+        "profile_image",
+        imageBase64
+      );
     };
 
     reader.readAsDataURL(file);
   }
 
+  async function deleteAccountData() {
+    const confirmDelete = window.confirm(
+      "هل أنت متأكد من حذف بيانات الحساب من هذا الجهاز وتسجيل الخروج؟"
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    if (userId) {
+      localStorage.removeItem(`name_${userId}`);
+      localStorage.removeItem(`phone_${userId}`);
+      localStorage.removeItem(
+        `profile_image_${userId}`
+      );
+    }
+
+    localStorage.removeItem("email");
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("role");
+    localStorage.removeItem("name");
+    localStorage.removeItem("phone");
+    localStorage.removeItem("profile_image");
+    localStorage.removeItem("admin");
+    localStorage.removeItem("isAdmin");
+    localStorage.removeItem("confirmed_user");
+    localStorage.removeItem(
+      "watheeq_email_confirmed"
+    );
+
+    sessionStorage.clear();
+
+    await supabase.auth.signOut();
+
+    alert(
+      "تم تسجيل الخروج وحذف البيانات المحفوظة من الجهاز"
+    );
+
+    router.replace("/signup");
+  }
+
+  async function logout() {
+    const confirmed = window.confirm(
+      "هل تريد تسجيل الخروج؟"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    sessionStorage.clear();
+
+    localStorage.removeItem("email");
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("role");
+    localStorage.removeItem("admin");
+    localStorage.removeItem("isAdmin");
+
+    await supabase.auth.signOut();
+
+    router.replace("/login");
+  }
+
+  if (loading) {
+    return (
+      <main
+        className="min-h-screen bg-gray-100 flex items-center justify-center p-4"
+        dir="rtl"
+      >
+        <div className="rounded-3xl bg-white p-8 text-center shadow-lg">
+          <div className="mb-4 text-4xl">⏳</div>
+
+          <p className="font-bold text-gray-600">
+            جاري تحميل الحساب...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-gray-100 p-4 pb-28" dir="rtl">
+    <main
+      className="min-h-screen bg-gray-100 p-4 pb-28"
+      dir="rtl"
+    >
       <div className="mx-auto w-full max-w-2xl rounded-3xl bg-white p-6 shadow-xl">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">حسابي</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              حسابي
+            </h1>
+
             <p className="mt-1 text-sm text-gray-500">
               عدّل بيانات حسابك وإعداداته
             </p>
@@ -173,7 +364,9 @@ export default function ProfilePage() {
               accept="image/*"
               className="hidden"
               onChange={(event) =>
-                changeProfileImage(event.target.files?.[0])
+                changeProfileImage(
+                  event.target.files?.[0]
+                )
               }
             />
           </label>
@@ -189,8 +382,11 @@ export default function ProfilePage() {
 
         <input
           value={name}
-          onChange={(event) => setName(event.target.value)}
-          className="mb-5 w-full rounded-xl border border-gray-300 p-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+          disabled={saving}
+          onChange={(event) =>
+            setName(event.target.value)
+          }
+          className="mb-5 w-full rounded-xl border border-gray-300 p-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:bg-gray-100"
         />
 
         <label className="mb-2 block font-bold text-gray-700">
@@ -201,20 +397,29 @@ export default function ProfilePage() {
           value={phone}
           inputMode="numeric"
           maxLength={10}
+          disabled={saving}
           onChange={(event) =>
-            setPhone(event.target.value.replace(/[^0-9]/g, ""))
+            setPhone(
+              event.target.value.replace(
+                /[^0-9]/g,
+                ""
+              )
+            )
           }
           placeholder="05xxxxxxxx"
-          className="mb-6 w-full rounded-xl border border-gray-300 p-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+          className="mb-6 w-full rounded-xl border border-gray-300 p-3 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:bg-gray-100"
           dir="ltr"
         />
 
         <button
           type="button"
           onClick={saveData}
-          className="mb-7 w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800"
+          disabled={saving}
+          className="mb-7 w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          حفظ التعديلات
+          {saving
+            ? "جاري الحفظ..."
+            : "حفظ التعديلات"}
         </button>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200">
@@ -245,8 +450,16 @@ export default function ProfilePage() {
 
         <button
           type="button"
-          onClick={deleteAccount}
-          className="mt-6 block w-full rounded-xl border border-red-200 bg-red-50 py-3 font-bold text-red-600 transition hover:bg-red-100"
+          onClick={logout}
+          className="mt-6 block w-full rounded-xl border border-gray-300 bg-gray-50 py-3 font-bold text-gray-700 transition hover:bg-gray-100"
+        >
+          تسجيل الخروج
+        </button>
+
+        <button
+          type="button"
+          onClick={deleteAccountData}
+          className="mt-3 block w-full rounded-xl border border-red-200 bg-red-50 py-3 font-bold text-red-600 transition hover:bg-red-100"
         >
           حذف بيانات الحساب من الجهاز
         </button>
