@@ -125,7 +125,7 @@ export default function RegisterPage() {
       }
 
       const redirectTo =
-        `${window.location.origin}/auth/callback`;
+        "https://رابط-موقعك-في-vercel.vercel.app/auth/callback";
 
       const { data, error } =
         await supabase.auth.signUp({
