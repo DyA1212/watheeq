@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Status = "loading" | "success" | "expired" | "error";
 
 export default function AuthCallbackPage() {
-  const router = useRouter();
-
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
@@ -28,6 +25,25 @@ export default function AuthCallbackPage() {
         if (errorCode || errorDescription) {
           const description =
             errorDescription?.toLowerCase() || "";
+
+          /*
+            إذا ظهر خطأ في الرابط، نتأكد أولًا:
+            ربما الحساب تأكد والجلسة موجودة بالفعل.
+          */
+          const {
+            data: { user: existingUser },
+          } = await supabase.auth.getUser();
+
+          if (
+            existingUser &&
+            existingUser.email_confirmed_at
+          ) {
+            if (!cancelled) {
+              setStatus("success");
+            }
+
+            return;
+          }
 
           if (
             errorCode === "otp_expired" ||
@@ -49,7 +65,7 @@ export default function AuthCallbackPage() {
         }
 
         /*
-          إذا الرابط يحتوي code، نستبدله بجلسة حقيقية.
+          نستبدل كود التفعيل بجلسة حقيقية.
         */
         if (code) {
           const { error: exchangeError } =
@@ -58,6 +74,25 @@ export default function AuthCallbackPage() {
             );
 
           if (exchangeError) {
+            /*
+              قد يكون الرابط استُخدم، لكن الحساب
+              تأكد والجلسة موجودة بالفعل.
+            */
+            const {
+              data: { user: existingUser },
+            } = await supabase.auth.getUser();
+
+            if (
+              existingUser &&
+              existingUser.email_confirmed_at
+            ) {
+              if (!cancelled) {
+                setStatus("success");
+              }
+
+              return;
+            }
+
             const message =
               exchangeError.message.toLowerCase();
 
@@ -81,7 +116,7 @@ export default function AuthCallbackPage() {
         }
 
         /*
-          نتأكد أن الجلسة والمستخدم موجودان فعلًا.
+          نتحقق من المستخدم بعد استبدال الكود.
         */
         const {
           data: { user },
@@ -89,6 +124,19 @@ export default function AuthCallbackPage() {
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
+          if (!cancelled) {
+            setStatus("error");
+          }
+
+          return;
+        }
+
+        /*
+          لا نسجل دخوله إلا بعد تأكيد البريد فعلًا.
+        */
+        if (!user.email_confirmed_at) {
+          await supabase.auth.signOut();
+
           if (!cancelled) {
             setStatus("error");
           }
@@ -122,7 +170,7 @@ export default function AuthCallbackPage() {
         );
 
         /*
-          نخزن بيانات الحساب المفتوح حاليًا.
+          بيانات الحساب المفتوح حاليًا.
         */
         sessionStorage.setItem(
           "user_id",
@@ -150,7 +198,7 @@ export default function AuthCallbackPage() {
         );
 
         /*
-          تخزين دائم ومربوط بكل مستخدم على حدة.
+          بيانات دائمة مرتبطة بمعرف المستخدم.
         */
         localStorage.setItem(
           "user_id",
@@ -178,7 +226,7 @@ export default function AuthCallbackPage() {
         );
 
         /*
-          تنظيف بيانات التسجيل المؤقتة.
+          نحذف بيانات التسجيل المؤقتة.
         */
         sessionStorage.removeItem(
           "pending_register_name"
@@ -234,23 +282,14 @@ export default function AuthCallbackPage() {
             تم تأكيد الحساب بنجاح
           </h1>
 
-          <p className="mb-6 text-sm leading-7 text-gray-500">
+          <p className="text-sm leading-7 text-gray-500">
             تم تفعيل حسابك في منصة{" "}
             <b>وثيق</b>.
             <br />
-            تم تسجيل دخولك بنجاح، ويمكنك الآن
-            العودة إلى الموقع.
+            تم تسجيل دخولك بنجاح.
+            <br />
+            يمكنك الآن الرجوع إلى الموقع من المتصفح.
           </p>
-
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = "/deal";
-            }}
-            className="w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800"
-          >
-            الدخول إلى وثيق
-          </button>
         </div>
       </main>
     );
@@ -267,25 +306,15 @@ export default function AuthCallbackPage() {
             ⚠️
           </div>
 
-          <h1 className="mb-2 text-2xl font-bold text-gray-900">
+          <h1 className="mb-3 text-2xl font-bold text-gray-900">
             رابط التفعيل منتهي
           </h1>
 
-          <p className="mb-6 text-sm leading-7 text-gray-500">
+          <p className="text-sm leading-7 text-gray-500">
             هذا الرابط قديم أو تم استخدامه من قبل.
-            ارجع إلى صفحة إنشاء الحساب واطلب رابط
-            تفعيل جديد.
+            <br />
+            ارجع للموقع واطلب رابط تفعيل جديد.
           </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              router.replace("/register")
-            }
-            className="w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800"
-          >
-            العودة لإنشاء الحساب
-          </button>
         </div>
       </main>
     );
@@ -302,24 +331,15 @@ export default function AuthCallbackPage() {
             ❌
           </div>
 
-          <h1 className="mb-2 text-2xl font-bold text-gray-900">
+          <h1 className="mb-3 text-2xl font-bold text-gray-900">
             تعذر تأكيد الحساب
           </h1>
 
-          <p className="mb-6 text-sm leading-7 text-gray-500">
-            الرابط غير صالح أو لم يتم إنشاء جلسة
-            للحساب. جرّب إرسال رابط تفعيل جديد.
+          <p className="text-sm leading-7 text-gray-500">
+            الرابط غير صالح أو لم يتم تأكيد البريد.
+            <br />
+            ارجع للموقع واطلب رابط تفعيل جديد.
           </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              router.replace("/register")
-            }
-            className="w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800"
-          >
-            العودة لإنشاء الحساب
-          </button>
         </div>
       </main>
     );
