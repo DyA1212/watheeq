@@ -125,7 +125,7 @@ export default function RegisterPage() {
       }
 
       const redirectTo =
-        "https://رابط-موقعك-في-vercel.vercel.app/auth/callback";
+         "https://watheeq-two.vercel.app/auth/callback";
 
       const { data, error } =
         await supabase.auth.signUp({
