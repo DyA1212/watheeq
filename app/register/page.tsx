@@ -200,25 +200,6 @@ export default function RegisterPage() {
         نحفظ الملف في profiles فقط.
         لا نسجل دخول المستخدم ولا نحفظ جلسة له الآن.
       */
-      const { error: profileInsertError } =
-        await supabase
-          .from("profiles")
-          .insert({
-            id: data.user.id,
-            email: cleanEmail,
-            name: cleanName,
-            phone: cleanPhone,
-          });
-
-      if (
-        profileInsertError &&
-        profileInsertError.code !== "23505"
-      ) {
-        console.error(
-          "Profile insert error:",
-          profileInsertError
-        );
-      }
 
       /*
         لو Supabase أنشأ جلسة مؤقتة،

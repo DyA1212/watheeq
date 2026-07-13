@@ -16,13 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   function clearOldAccountData() {
-    sessionStorage.removeItem("email");
-    sessionStorage.removeItem("name");
-    sessionStorage.removeItem("phone");
-    sessionStorage.removeItem("role");
-    sessionStorage.removeItem("user_id");
-    sessionStorage.removeItem("profile_image");
-    sessionStorage.removeItem("confirmed_user");
+    sessionStorage.clear();
 
     localStorage.removeItem("email");
     localStorage.removeItem("name");
@@ -30,7 +24,6 @@ export default function LoginPage() {
     localStorage.removeItem("role");
     localStorage.removeItem("user_id");
     localStorage.removeItem("profile_image");
-
     localStorage.removeItem("admin");
     localStorage.removeItem("isAdmin");
     localStorage.removeItem("confirmed_user");
@@ -38,9 +31,7 @@ export default function LoginPage() {
   }
 
   async function login() {
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
     setError("");
 
@@ -68,15 +59,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      /*
-        تسجيل الخروج من أي حساب قديم في Supabase
-        قبل الدخول بالحساب الجديد.
-      */
       await supabase.auth.signOut();
-
-      /*
-        حذف بيانات الحساب السابق من التخزين.
-      */
       clearOldAccountData();
 
       const { data, error: loginError } =
@@ -107,9 +90,7 @@ export default function LoginPage() {
           errorMessage.includes("too many requests") ||
           errorMessage.includes("rate limit")
         ) {
-          setError(
-            "تمت محاولات كثيرة، انتظر قليلًا ثم حاول مرة ثانية"
-          );
+          setError("تمت محاولات كثيرة، انتظر قليلًا ثم حاول مرة ثانية");
           return;
         }
 
@@ -130,7 +111,6 @@ export default function LoginPage() {
       if (userError || !user) {
         await supabase.auth.signOut();
         clearOldAccountData();
-
         setError("تعذر التحقق من جلسة تسجيل الدخول");
         return;
       }
@@ -138,42 +118,39 @@ export default function LoginPage() {
       const currentEmail = (
         user.email ||
         userEmail
-      ).trim().toLowerCase();
+      )
+        .trim()
+        .toLowerCase();
 
-      const role =
-        currentEmail === ADMIN_EMAIL ? "admin" : "user";
+      const isAdmin = currentEmail === ADMIN_EMAIL;
+      const role = isAdmin ? "admin" : "user";
 
-      /*
-        كل مستخدم له مفاتيح خاصة به.
-        هذا يمنع اختلاط الاسم والصورة بين الحسابات.
-      */
-      const savedName = localStorage.getItem(
-        `name_${user.id}`
-      );
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, phone")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      const savedPhone = localStorage.getItem(
-        `phone_${user.id}`
-      );
-
+      const savedName = localStorage.getItem(`name_${user.id}`);
+      const savedPhone = localStorage.getItem(`phone_${user.id}`);
       const savedImage = localStorage.getItem(
         `profile_image_${user.id}`
       );
 
       const userName = String(
-        savedName ||
+        profile?.name ||
+          savedName ||
           user.user_metadata?.name ||
-          "مستخدم"
+          (isAdmin ? "الإدارة" : "مستخدم")
       );
 
       const userPhone = String(
-        savedPhone ||
+        profile?.phone ||
+          savedPhone ||
           user.user_metadata?.phone ||
           ""
       );
 
-      /*
-        sessionStorage يحتوي بيانات الحساب المفتوح الآن فقط.
-      */
       sessionStorage.setItem("user_id", user.id);
       sessionStorage.setItem("email", currentEmail);
       sessionStorage.setItem("name", userName);
@@ -181,39 +158,21 @@ export default function LoginPage() {
       sessionStorage.setItem("role", role);
 
       if (savedImage) {
-        sessionStorage.setItem(
-          "profile_image",
-          savedImage
-        );
-      } else {
-        sessionStorage.removeItem("profile_image");
+        sessionStorage.setItem("profile_image", savedImage);
       }
 
-      /*
-        حفظ هوية الحساب الحالي.
-        بيانات الملف الشخصي الدائمة تكون مرتبطة بـ user.id.
-      */
       localStorage.setItem("user_id", user.id);
       localStorage.setItem("email", currentEmail);
       localStorage.setItem("role", role);
 
-      localStorage.setItem(
-        `name_${user.id}`,
-        userName
-      );
+      localStorage.setItem(`name_${user.id}`, userName);
+      localStorage.setItem(`phone_${user.id}`, userPhone);
 
-      localStorage.setItem(
-        `phone_${user.id}`,
-        userPhone
-      );
-
-      /*
-        لا نحفظ الاسم أو الصورة بمفتاح عام،
-        حتى لا تظهر بيانات حساب في حساب آخر.
-      */
       localStorage.removeItem("name");
       localStorage.removeItem("phone");
       localStorage.removeItem("profile_image");
+      localStorage.removeItem("admin");
+      localStorage.removeItem("isAdmin");
 
       router.replace("/deal");
       router.refresh();
@@ -296,9 +255,7 @@ export default function LoginPage() {
           <button
             type="button"
             disabled={loading}
-            onClick={() =>
-              router.push("/forgot-password")
-            }
+            onClick={() => router.push("/forgot-password")}
             className="text-sm text-teal-700 hover:underline disabled:opacity-50"
           >
             نسيت كلمة المرور؟
@@ -317,9 +274,7 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full rounded-xl bg-teal-700 py-4 text-base font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading
-            ? "جاري تسجيل الدخول..."
-            : "تسجيل الدخول"}
+          {loading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
         </button>
 
         <div className="mt-8 text-center">
