@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Status = "loading" | "success" | "expired" | "error";
 
 export default function AuthCallbackPage() {
+  const router = useRouter();
+
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
@@ -26,10 +29,6 @@ export default function AuthCallbackPage() {
           const description =
             errorDescription?.toLowerCase() || "";
 
-          /*
-            إذا ظهر خطأ في الرابط، نتأكد أولًا:
-            ربما الحساب تأكد والجلسة موجودة بالفعل.
-          */
           const {
             data: { user: existingUser },
           } = await supabase.auth.getUser();
@@ -64,9 +63,6 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        /*
-          نستبدل كود التفعيل بجلسة حقيقية.
-        */
         if (code) {
           const { error: exchangeError } =
             await supabase.auth.exchangeCodeForSession(
@@ -74,10 +70,6 @@ export default function AuthCallbackPage() {
             );
 
           if (exchangeError) {
-            /*
-              قد يكون الرابط استُخدم، لكن الحساب
-              تأكد والجلسة موجودة بالفعل.
-            */
             const {
               data: { user: existingUser },
             } = await supabase.auth.getUser();
@@ -115,9 +107,6 @@ export default function AuthCallbackPage() {
           }
         }
 
-        /*
-          نتحقق من المستخدم بعد استبدال الكود.
-        */
         const {
           data: { user },
           error: userError,
@@ -131,9 +120,6 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        /*
-          لا نسجل دخوله إلا بعد تأكيد البريد فعلًا.
-        */
         if (!user.email_confirmed_at) {
           await supabase.auth.signOut();
 
@@ -169,9 +155,6 @@ export default function AuthCallbackPage() {
             ""
         );
 
-        /*
-          بيانات الحساب المفتوح حاليًا.
-        */
         sessionStorage.setItem(
           "user_id",
           user.id
@@ -197,9 +180,6 @@ export default function AuthCallbackPage() {
           "user"
         );
 
-        /*
-          بيانات دائمة مرتبطة بمعرف المستخدم.
-        */
         localStorage.setItem(
           "user_id",
           user.id
@@ -225,9 +205,6 @@ export default function AuthCallbackPage() {
           userPhone
         );
 
-        /*
-          نحذف بيانات التسجيل المؤقتة.
-        */
         sessionStorage.removeItem(
           "pending_register_name"
         );
@@ -282,14 +259,22 @@ export default function AuthCallbackPage() {
             تم تأكيد الحساب بنجاح
           </h1>
 
-          <p className="text-sm leading-7 text-gray-500">
+          <p className="mb-6 text-sm leading-7 text-gray-500">
             تم تفعيل حسابك في منصة{" "}
             <b>وثيق</b>.
             <br />
             تم تسجيل دخولك بنجاح.
-            <br />
-            يمكنك الآن الرجوع إلى الموقع من المتصفح.
           </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "/deal";
+            }}
+            className="w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800"
+          >
+            الدخول إلى الموقع
+          </button>
         </div>
       </main>
     );
@@ -310,11 +295,20 @@ export default function AuthCallbackPage() {
             رابط التفعيل منتهي
           </h1>
 
-          <p className="text-sm leading-7 text-gray-500">
+          <p className="mb-6 text-sm leading-7 text-gray-500">
             هذا الرابط قديم أو تم استخدامه من قبل.
             <br />
-            ارجع للموقع واطلب رابط تفعيل جديد.
+            ارجع إلى صفحة إنشاء الحساب واطلب رابط
+            تفعيل جديد.
           </p>
+
+          <button
+            type="button"
+            onClick={() => router.replace("/register")}
+            className="w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800"
+          >
+            العودة لإنشاء الحساب
+          </button>
         </div>
       </main>
     );
@@ -335,11 +329,19 @@ export default function AuthCallbackPage() {
             تعذر تأكيد الحساب
           </h1>
 
-          <p className="text-sm leading-7 text-gray-500">
+          <p className="mb-6 text-sm leading-7 text-gray-500">
             الرابط غير صالح أو لم يتم تأكيد البريد.
             <br />
-            ارجع للموقع واطلب رابط تفعيل جديد.
+            ارجع إلى الموقع واطلب رابط تفعيل جديد.
           </p>
+
+          <button
+            type="button"
+            onClick={() => router.replace("/register")}
+            className="w-full rounded-xl bg-teal-700 py-3 font-bold text-white transition hover:bg-teal-800"
+          >
+            العودة لإنشاء الحساب
+          </button>
         </div>
       </main>
     );

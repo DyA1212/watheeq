@@ -24,6 +24,10 @@ export default function NavigationWrapper() {
     return null;
   }
 
+  if (pathname.startsWith("/auth")) {
+    return null;
+  }
+
   if (pathname.startsWith("/admin")) {
     return null;
   }
