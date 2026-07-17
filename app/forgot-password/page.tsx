@@ -84,63 +84,56 @@ export default function ForgotPasswordPage() {
     return "حدث خطأ، حاول مرة أخرى";
   }
 
-  async function sendResetCode() {
-    clearMessages();
+ async function sendResetCode() {
+  clearMessages();
 
-    const cleanEmail = email.trim().toLowerCase();
+  const cleanEmail = email.trim().toLowerCase();
 
-    if (!cleanEmail) {
-      setErrorMsg("اكتب بريدك الإلكتروني");
-      return;
-    }
-
-    const emailRegex =
-      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
-    if (!emailRegex.test(cleanEmail)) {
-      setErrorMsg("البريد الإلكتروني غير صحيح");
-      return;
-    }
-
-    if (!siteKey) {
-      setErrorMsg("مفتاح التحقق غير موجود في إعدادات الموقع");
-      return;
-    }
-
-    if (!captchaToken) {
-      setErrorMsg("انتظر حتى يكتمل التحقق من أنك لست روبوتًا");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        cleanEmail,
-        {
-          captchaToken,
-        }
-      );
-
-      if (error) {
-        throw error;
-      }
-
-      setEmail(cleanEmail);
-      setCode("");
-      setStep("code");
-      setMessage("تم إرسال كود من 6 أرقام إلى بريدك الإلكتروني ✅");
-      resetCaptcha();
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-
-      setErrorMsg(getArabicError(errorMessage));
-      resetCaptcha();
-    } finally {
-      setLoading(false);
-    }
+  if (!cleanEmail) {
+    setErrorMsg("اكتب بريدك الإلكتروني");
+    return;
   }
+
+  const emailRegex =
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  if (!emailRegex.test(cleanEmail)) {
+    setErrorMsg("البريد الإلكتروني غير صحيح");
+    return;
+  }
+
+  if (!captchaToken) {
+    setErrorMsg("أكمل التحقق أولاً");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const token = captchaToken;
+
+    // امسح التوكن الحالي مباشرة حتى لا يُستخدم مرة أخرى
+    resetCaptcha();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      cleanEmail,
+      {
+        captchaToken: token,
+      }
+    );
+
+    if (error) throw error;
+
+    setEmail(cleanEmail);
+    setCode("");
+    setStep("code");
+    setMessage("تم إرسال كود من 6 أرقام إلى بريدك الإلكتروني ✅");
+  } catch (error: any) {
+    setErrorMsg(getArabicError(error.message));
+  } finally {
+    setLoading(false);
+  }
+}
 
   async function verifyResetCode() {
     clearMessages();
