@@ -1,16 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Turnstile,
+  type TurnstileInstance,
+} from "@marsidev/react-turnstile";
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_EMAIL = "deaabd89@gmail.com";
 
+const TURNSTILE_SITE_KEY =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
 export default function LoginPage() {
   const router = useRouter();
 
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaError, setCaptchaError] = useState("");
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,10 +42,21 @@ export default function LoginPage() {
     localStorage.removeItem("watheeq_email_confirmed");
   }
 
+  function resetCaptcha() {
+    setCaptchaToken("");
+
+    try {
+      turnstileRef.current?.reset();
+    } catch {
+      // تجاهل الخطأ إذا لم يكن التحقق جاهزًا
+    }
+  }
+
   async function login() {
     if (loading) return;
 
     setError("");
+    setCaptchaError("");
 
     const userEmail = email.trim().toLowerCase();
     const userPassword = password.trim();
@@ -56,6 +79,18 @@ export default function LoginPage() {
       return;
     }
 
+    if (!TURNSTILE_SITE_KEY) {
+      setError(
+        "مفتاح التحقق غير موجود. أضف NEXT_PUBLIC_TURNSTILE_SITE_KEY في ملف .env.local"
+      );
+      return;
+    }
+
+    if (!captchaToken) {
+      setCaptchaError("أكمل التحقق من أنك لست روبوتًا");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -66,10 +101,27 @@ export default function LoginPage() {
         await supabase.auth.signInWithPassword({
           email: userEmail,
           password: userPassword,
+
+          options: {
+            captchaToken,
+          },
         });
 
       if (loginError) {
+        resetCaptcha();
+
         const errorMessage = loginError.message.toLowerCase();
+
+        if (
+          errorMessage.includes("captcha") ||
+          errorMessage.includes("challenge") ||
+          errorMessage.includes("verification")
+        ) {
+          setError(
+            "فشل التحقق من أنك لست روبوتًا، حاول مرة ثانية"
+          );
+          return;
+        }
 
         if (errorMessage.includes("email not confirmed")) {
           setError(
@@ -82,7 +134,9 @@ export default function LoginPage() {
           errorMessage.includes("invalid login credentials") ||
           errorMessage.includes("invalid credentials")
         ) {
-          setError("البريد الإلكتروني أو كلمة المرور غير صحيحة");
+          setError(
+            "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+          );
           return;
         }
 
@@ -90,7 +144,9 @@ export default function LoginPage() {
           errorMessage.includes("too many requests") ||
           errorMessage.includes("rate limit")
         ) {
-          setError("تمت محاولات كثيرة، انتظر قليلًا ثم حاول مرة ثانية");
+          setError(
+            "تمت محاولات كثيرة، انتظر قليلًا ثم حاول مرة ثانية"
+          );
           return;
         }
 
@@ -99,7 +155,11 @@ export default function LoginPage() {
       }
 
       if (!data.user || !data.session) {
-        setError("تعذر إنشاء جلسة تسجيل الدخول، حاول مرة ثانية");
+        resetCaptcha();
+
+        setError(
+          "تعذر إنشاء جلسة تسجيل الدخول، حاول مرة ثانية"
+        );
         return;
       }
 
@@ -111,14 +171,13 @@ export default function LoginPage() {
       if (userError || !user) {
         await supabase.auth.signOut();
         clearOldAccountData();
+        resetCaptcha();
+
         setError("تعذر التحقق من جلسة تسجيل الدخول");
         return;
       }
 
-      const currentEmail = (
-        user.email ||
-        userEmail
-      )
+      const currentEmail = (user.email || userEmail)
         .trim()
         .toLowerCase();
 
@@ -131,8 +190,14 @@ export default function LoginPage() {
         .eq("id", user.id)
         .maybeSingle();
 
-      const savedName = localStorage.getItem(`name_${user.id}`);
-      const savedPhone = localStorage.getItem(`phone_${user.id}`);
+      const savedName = localStorage.getItem(
+        `name_${user.id}`
+      );
+
+      const savedPhone = localStorage.getItem(
+        `phone_${user.id}`
+      );
+
       const savedImage = localStorage.getItem(
         `profile_image_${user.id}`
       );
@@ -158,15 +223,25 @@ export default function LoginPage() {
       sessionStorage.setItem("role", role);
 
       if (savedImage) {
-        sessionStorage.setItem("profile_image", savedImage);
+        sessionStorage.setItem(
+          "profile_image",
+          savedImage
+        );
       }
 
       localStorage.setItem("user_id", user.id);
       localStorage.setItem("email", currentEmail);
       localStorage.setItem("role", role);
 
-      localStorage.setItem(`name_${user.id}`, userName);
-      localStorage.setItem(`phone_${user.id}`, userPhone);
+      localStorage.setItem(
+        `name_${user.id}`,
+        userName
+      );
+
+      localStorage.setItem(
+        `phone_${user.id}`,
+        userPhone
+      );
 
       localStorage.removeItem("name");
       localStorage.removeItem("phone");
@@ -179,6 +254,7 @@ export default function LoginPage() {
     } catch {
       await supabase.auth.signOut();
       clearOldAccountData();
+      resetCaptcha();
 
       setError("حدث خطأ غير متوقع، حاول مرة ثانية");
     } finally {
@@ -189,7 +265,11 @@ export default function LoginPage() {
   function handleKeyDown(
     event: React.KeyboardEvent<HTMLInputElement>
   ) {
-    if (event.key === "Enter" && !loading) {
+    if (
+      event.key === "Enter" &&
+      !loading &&
+      captchaToken
+    ) {
       login();
     }
   }
@@ -222,13 +302,18 @@ export default function LoginPage() {
           value={email}
           disabled={loading}
           onKeyDown={handleKeyDown}
-          onChange={(event) =>
+          onChange={(event) => {
+            setError("");
+
             setEmail(
               event.target.value
-                .replace(/[^a-zA-Z0-9@._+-]/g, "")
+                .replace(
+                  /[^a-zA-Z0-9@._+-]/g,
+                  ""
+                )
                 .toLowerCase()
-            )
-          }
+            );
+          }}
           className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 transition focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed disabled:bg-gray-100"
           dir="ltr"
         />
@@ -240,13 +325,15 @@ export default function LoginPage() {
           value={password}
           disabled={loading}
           onKeyDown={handleKeyDown}
-          onChange={(event) =>
+          onChange={(event) => {
+            setError("");
+
             setPassword(
               event.target.value
                 .replace(/[\u0600-\u06FF]/g, "")
                 .replace(/\s/g, "")
-            )
-          }
+            );
+          }}
           className="mb-2 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 transition focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed disabled:bg-gray-100"
           dir="ltr"
         />
@@ -255,11 +342,62 @@ export default function LoginPage() {
           <button
             type="button"
             disabled={loading}
-            onClick={() => router.push("/forgot-password")}
+            onClick={() =>
+              router.push("/forgot-password")
+            }
             className="text-sm text-teal-700 hover:underline disabled:opacity-50"
           >
             نسيت كلمة المرور؟
           </button>
+        </div>
+
+        <div className="mb-5">
+          {TURNSTILE_SITE_KEY ? (
+            <div className="flex justify-center overflow-hidden rounded-xl">
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={TURNSTILE_SITE_KEY}
+                options={{
+                  theme: "light",
+                  language: "ar",
+                  size: "flexible",
+                }}
+                onSuccess={(token) => {
+                  setCaptchaToken(token);
+                  setCaptchaError("");
+                  setError("");
+                }}
+                onExpire={() => {
+                  setCaptchaToken("");
+                  setCaptchaError(
+                    "انتهت مدة التحقق، أعد التحقق مرة ثانية"
+                  );
+                }}
+                onError={() => {
+                  setCaptchaToken("");
+                  setCaptchaError(
+                    "تعذر تحميل التحقق، حدّث الصفحة وحاول مرة ثانية"
+                  );
+                }}
+              />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-700">
+              لم تتم إضافة مفتاح Turnstile للموقع
+            </div>
+          )}
+
+          {captchaToken && (
+            <p className="mt-2 text-center text-sm font-medium text-teal-700">
+              تم التحقق بنجاح ✓
+            </p>
+          )}
+
+          {captchaError && (
+            <p className="mt-2 text-center text-sm text-red-600">
+              {captchaError}
+            </p>
+          )}
         </div>
 
         {error && (
@@ -271,10 +409,16 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={login}
-          disabled={loading}
+          disabled={
+            loading ||
+            !captchaToken ||
+            !TURNSTILE_SITE_KEY
+          }
           className="w-full rounded-xl bg-teal-700 py-4 text-base font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
+          {loading
+            ? "جاري تسجيل الدخول..."
+            : "تسجيل الدخول"}
         </button>
 
         <div className="mt-8 text-center">

@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { supabase } from "@/lib/supabase";
+
+const TURNSTILE_SITE_KEY =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  const turnstileRef = useRef<any>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaError, setCaptchaError] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -27,7 +36,19 @@ export default function RegisterPage() {
     localStorage.removeItem("admin");
     localStorage.removeItem("isAdmin");
     localStorage.removeItem("confirmed_user");
-    localStorage.removeItem("watheeq_email_confirmed");
+    localStorage.removeItem(
+      "watheeq_email_confirmed"
+    );
+  }
+
+  function resetCaptcha() {
+    setCaptchaToken("");
+
+    try {
+      turnstileRef.current?.reset();
+    } catch {
+      // تجاهل الخطأ إذا لم يكن Turnstile جاهزًا
+    }
   }
 
   async function register() {
@@ -36,9 +57,12 @@ export default function RegisterPage() {
     }
 
     setErrorMsg("");
+    setCaptchaError("");
 
     const cleanName = name.trim();
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = email
+      .trim()
+      .toLowerCase();
     const cleanPhone = phone.trim();
     const cleanPassword = password.trim();
 
@@ -78,11 +102,26 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!TURNSTILE_SITE_KEY) {
+      setErrorMsg(
+        "مفتاح التحقق غير موجود في ملف .env.local"
+      );
+      return;
+    }
+
+    if (!captchaToken) {
+      setCaptchaError(
+        "أكمل التحقق من أنك لست روبوتًا"
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
       /*
-        نقفل جلسة أي حساب قديم قبل إنشاء الحساب الجديد.
+        نقفل جلسة أي حساب قديم قبل إنشاء
+        الحساب الجديد.
       */
       await supabase.auth.signOut();
       clearCurrentAccountData();
@@ -91,7 +130,10 @@ export default function RegisterPage() {
         await supabase.auth.signUp({
           email: cleanEmail,
           password: cleanPassword,
+
           options: {
+            captchaToken,
+
             data: {
               name: cleanName,
               phone: cleanPhone,
@@ -101,12 +143,32 @@ export default function RegisterPage() {
         });
 
       if (error) {
-        const message = error.message.toLowerCase();
+        resetCaptcha();
+
+        const message =
+          error.message.toLowerCase();
 
         if (
-          message.includes("already registered") ||
-          message.includes("already been registered") ||
-          message.includes("user already exists") ||
+          message.includes("captcha") ||
+          message.includes("challenge") ||
+          message.includes("verification")
+        ) {
+          setErrorMsg(
+            "فشل التحقق من أنك لست روبوتًا، حاول مرة ثانية"
+          );
+          return;
+        }
+
+        if (
+          message.includes(
+            "already registered"
+          ) ||
+          message.includes(
+            "already been registered"
+          ) ||
+          message.includes(
+            "user already exists"
+          ) ||
           message.includes("already exists")
         ) {
           setErrorMsg(
@@ -117,7 +179,9 @@ export default function RegisterPage() {
 
         if (
           message.includes("rate limit") ||
-          message.includes("too many requests")
+          message.includes(
+            "too many requests"
+          )
         ) {
           setErrorMsg(
             "تمت محاولات كثيرة، انتظر قليلًا ثم حاول مرة ثانية"
@@ -135,7 +199,10 @@ export default function RegisterPage() {
           return;
         }
 
-        console.error("Sign up error:", error);
+        console.error(
+          "Sign up error:",
+          error
+        );
 
         setErrorMsg(
           "تعذر إنشاء الحساب، حاول مرة ثانية"
@@ -144,6 +211,8 @@ export default function RegisterPage() {
       }
 
       if (!data.user) {
+        resetCaptcha();
+
         setErrorMsg(
           "تعذر إنشاء الحساب، حاول مرة ثانية"
         );
@@ -151,14 +220,17 @@ export default function RegisterPage() {
       }
 
       /*
-        في بعض إعدادات Supabase يرجع مستخدم بدون identities
-        إذا كان البريد مسجلًا من قبل.
+        في بعض إعدادات Supabase يرجع مستخدم
+        بدون identities إذا كان البريد مسجلًا.
       */
       if (
-        Array.isArray(data.user.identities) &&
+        Array.isArray(
+          data.user.identities
+        ) &&
         data.user.identities.length === 0
       ) {
         await supabase.auth.signOut();
+        resetCaptcha();
 
         setErrorMsg(
           "هذا الحساب موجود بالفعل، سجل الدخول"
@@ -167,10 +239,12 @@ export default function RegisterPage() {
       }
 
       /*
-        بما أن Confirm email مطفأ، لازم ترجع جلسة مباشرة.
+        بما أن Confirm email مطفأ، لازم
+        ترجع جلسة مباشرة.
       */
       if (!data.session) {
         await supabase.auth.signOut();
+        resetCaptcha();
 
         setErrorMsg(
           "لم يتم تسجيل الدخول مباشرة. تأكد أن خيار Confirm email مطفأ في Supabase"
@@ -179,9 +253,11 @@ export default function RegisterPage() {
       }
 
       const user = data.user;
+
       const currentEmail =
-        user.email?.trim().toLowerCase() ||
-        cleanEmail;
+        user.email
+          ?.trim()
+          .toLowerCase() || cleanEmail;
 
       const userName = String(
         user.user_metadata?.name ||
@@ -198,18 +274,48 @@ export default function RegisterPage() {
       /*
         بيانات الجلسة الحالية.
       */
-      sessionStorage.setItem("user_id", user.id);
-      sessionStorage.setItem("email", currentEmail);
-      sessionStorage.setItem("name", userName);
-      sessionStorage.setItem("phone", userPhone);
-      sessionStorage.setItem("role", "user");
+      sessionStorage.setItem(
+        "user_id",
+        user.id
+      );
+
+      sessionStorage.setItem(
+        "email",
+        currentEmail
+      );
+
+      sessionStorage.setItem(
+        "name",
+        userName
+      );
+
+      sessionStorage.setItem(
+        "phone",
+        userPhone
+      );
+
+      sessionStorage.setItem(
+        "role",
+        "user"
+      );
 
       /*
         بيانات دائمة منفصلة لكل حساب.
       */
-      localStorage.setItem("user_id", user.id);
-      localStorage.setItem("email", currentEmail);
-      localStorage.setItem("role", "user");
+      localStorage.setItem(
+        "user_id",
+        user.id
+      );
+
+      localStorage.setItem(
+        "email",
+        currentEmail
+      );
+
+      localStorage.setItem(
+        "role",
+        "user"
+      );
 
       localStorage.setItem(
         `name_${user.id}`,
@@ -223,12 +329,15 @@ export default function RegisterPage() {
 
       localStorage.removeItem("name");
       localStorage.removeItem("phone");
-      localStorage.removeItem("profile_image");
+      localStorage.removeItem(
+        "profile_image"
+      );
       localStorage.removeItem("admin");
       localStorage.removeItem("isAdmin");
 
       /*
-        تأكيد أن جلسة Supabase تعمل قبل الدخول.
+        تأكيد أن جلسة Supabase تعمل
+        قبل الدخول.
       */
       const {
         data: { user: verifiedUser },
@@ -238,6 +347,7 @@ export default function RegisterPage() {
       if (userError || !verifiedUser) {
         await supabase.auth.signOut();
         clearCurrentAccountData();
+        resetCaptcha();
 
         setErrorMsg(
           "تم إنشاء الحساب لكن تعذر بدء الجلسة، سجل الدخول يدويًا"
@@ -248,10 +358,14 @@ export default function RegisterPage() {
       router.replace("/deal");
       router.refresh();
     } catch (error) {
-      console.error("Register error:", error);
+      console.error(
+        "Register error:",
+        error
+      );
 
       await supabase.auth.signOut();
       clearCurrentAccountData();
+      resetCaptcha();
 
       setErrorMsg(
         "حدث خطأ أثناء إنشاء الحساب، حاول مرة ثانية"
@@ -264,7 +378,11 @@ export default function RegisterPage() {
   function handleKeyDown(
     event: React.KeyboardEvent<HTMLInputElement>
   ) {
-    if (event.key === "Enter" && !loading) {
+    if (
+      event.key === "Enter" &&
+      !loading &&
+      captchaToken
+    ) {
       register();
     }
   }
@@ -285,19 +403,22 @@ export default function RegisterPage() {
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            أنشئ حسابك وابدأ استخدام منصة وثيق
+            أنشئ حسابك وابدأ استخدام منصة
+            وثيق
           </p>
         </div>
 
         <input
           type="text"
+          autoComplete="name"
           placeholder="الاسم الكامل"
           value={name}
           disabled={loading}
           onKeyDown={handleKeyDown}
-          onChange={(event) =>
-            setName(event.target.value)
-          }
+          onChange={(event) => {
+            setErrorMsg("");
+            setName(event.target.value);
+          }}
           className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed disabled:bg-gray-100"
         />
 
@@ -309,14 +430,19 @@ export default function RegisterPage() {
           value={email}
           disabled={loading}
           onKeyDown={handleKeyDown}
-          onChange={(event) =>
+          onChange={(event) => {
+            setErrorMsg("");
+
             setEmail(
               event.target.value
-                .replace(/[\u0600-\u06FF]/g, "")
+                .replace(
+                  /[\u0600-\u06FF]/g,
+                  ""
+                )
                 .replace(/\s/g, "")
                 .toLowerCase()
-            )
-          }
+            );
+          }}
           className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed disabled:bg-gray-100"
           dir="ltr"
         />
@@ -330,14 +456,16 @@ export default function RegisterPage() {
           disabled={loading}
           maxLength={10}
           onKeyDown={handleKeyDown}
-          onChange={(event) =>
+          onChange={(event) => {
+            setErrorMsg("");
+
             setPhone(
               event.target.value.replace(
                 /[^0-9]/g,
                 ""
               )
-            )
-          }
+            );
+          }}
           className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed disabled:bg-gray-100"
           dir="ltr"
         />
@@ -349,16 +477,75 @@ export default function RegisterPage() {
           value={password}
           disabled={loading}
           onKeyDown={handleKeyDown}
-          onChange={(event) =>
+          onChange={(event) => {
+            setErrorMsg("");
+
             setPassword(
               event.target.value
-                .replace(/[\u0600-\u06FF]/g, "")
+                .replace(
+                  /[\u0600-\u06FF]/g,
+                  ""
+                )
                 .replace(/\s/g, "")
-            )
-          }
-          className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed disabled:bg-gray-100"
+            );
+          }}
+          className="mb-5 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed disabled:bg-gray-100"
           dir="ltr"
         />
+
+        <div className="mb-5">
+          {TURNSTILE_SITE_KEY ? (
+            <div className="flex justify-center overflow-hidden rounded-xl">
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={
+                  TURNSTILE_SITE_KEY
+                }
+                options={{
+                  theme: "light",
+                  language: "ar",
+                  size: "flexible",
+                }}
+                onSuccess={(token) => {
+                  setCaptchaToken(token);
+                  setCaptchaError("");
+                  setErrorMsg("");
+                }}
+                onExpire={() => {
+                  setCaptchaToken("");
+
+                  setCaptchaError(
+                    "انتهت مدة التحقق، أعد التحقق مرة ثانية"
+                  );
+                }}
+                onError={() => {
+                  setCaptchaToken("");
+
+                  setCaptchaError(
+                    "تعذر تحميل التحقق، حدّث الصفحة وحاول مرة ثانية"
+                  );
+                }}
+              />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-700">
+              لم تتم إضافة مفتاح
+              Turnstile للموقع
+            </div>
+          )}
+
+          {captchaToken && (
+            <p className="mt-2 text-center text-sm font-medium text-teal-700">
+              تم التحقق بنجاح ✓
+            </p>
+          )}
+
+          {captchaError && (
+            <p className="mt-2 text-center text-sm text-red-600">
+              {captchaError}
+            </p>
+          )}
+        </div>
 
         {errorMsg && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-sm leading-6 text-red-600">
@@ -369,7 +556,11 @@ export default function RegisterPage() {
         <button
           type="button"
           onClick={register}
-          disabled={loading}
+          disabled={
+            loading ||
+            !captchaToken ||
+            !TURNSTILE_SITE_KEY
+          }
           className="w-full rounded-xl bg-teal-700 py-4 text-base font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading
@@ -385,7 +576,9 @@ export default function RegisterPage() {
           <button
             type="button"
             disabled={loading}
-            onClick={() => router.push("/login")}
+            onClick={() =>
+              router.push("/login")
+            }
             className="mt-3 w-full rounded-xl border-2 border-teal-700 py-3 font-semibold text-teal-700 transition hover:bg-teal-700 hover:text-white disabled:opacity-50"
           >
             تسجيل الدخول
