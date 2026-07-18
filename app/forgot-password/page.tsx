@@ -95,7 +95,7 @@ export default function ForgotPasswordPage() {
     const token = captchaToken;
 
     // منع إعادة استخدام رمز التحقق نفسه
-    setCaptchaToken("");
+    
 
     try {
       const redirectTo =
@@ -106,6 +106,7 @@ export default function ForgotPasswordPage() {
       const { error } =
         await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo,
+         captchaToken: token,
         });
 
       if (error) {
