@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -8,6 +8,8 @@ type LinkStatus = "checking" | "ready" | "invalid" | "success";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+
+  const changingRef = useRef(false);
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,34 +24,98 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     let mounted = true;
 
-    async function checkRecoverySession() {
+    async function prepareRecoverySession() {
       try {
+        const params = new URLSearchParams(
+          window.location.search
+        );
+
+        const code = params.get("code");
+
         /*
-          Supabase يعالج بيانات رابط استعادة كلمة المرور
-          ويُنشئ جلسة مؤقتة للمستخدم.
+          أولًا نتأكد هل Supabase أنشأ جلسة تلقائيًا
+          من رابط استعادة كلمة المرور.
         */
         const {
-          data: { session },
-          error,
+          data: { session: currentSession },
+          error: sessionError,
         } = await supabase.auth.getSession();
 
         if (!mounted) return;
 
-        if (error) {
-          setLinkStatus("invalid");
-          return;
-        }
-
-        if (session) {
+        if (currentSession) {
           setLinkStatus("ready");
+          setErrorMsg("");
           return;
         }
 
         /*
-          نعطي Supabase وقتًا بسيطًا لمعالجة الرابط،
-          خصوصًا عندما تكون البيانات موجودة بعد علامة #.
+          عند استخدام PKCE يرجع المستخدم إلى الصفحة
+          ومعه code في الرابط. نحوله إلى جلسة.
+        */
+        if (code) {
+          const {
+            data,
+            error: exchangeError,
+          } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (!mounted) return;
+
+          if (!exchangeError && data.session) {
+            setLinkStatus("ready");
+            setErrorMsg("");
+
+            /*
+              نحذف code من شريط الرابط حتى لا تتم
+              محاولة استخدامه مرة ثانية عند تحديث الصفحة.
+            */
+            window.history.replaceState(
+              {},
+              document.title,
+              window.location.pathname
+            );
+
+            return;
+          }
+
+          /*
+            قد يكون Supabase عالج الرمز تلقائيًا،
+            لذلك نتحقق من الجلسة مرة ثانية.
+          */
+          const {
+            data: { session: sessionAfterExchange },
+          } = await supabase.auth.getSession();
+
+          if (!mounted) return;
+
+          if (sessionAfterExchange) {
+            setLinkStatus("ready");
+            setErrorMsg("");
+            return;
+          }
+
+          if (exchangeError) {
+            console.error(
+              "Recovery code exchange error:",
+              exchangeError
+            );
+          }
+        }
+
+        if (sessionError) {
+          console.error(
+            "Recovery session error:",
+            sessionError
+          );
+        }
+
+        /*
+          نعطي Supabase وقتًا قصيرًا لمعالجة روابط
+          الاستعادة التي تستخدم البيانات بعد علامة #.
         */
         window.setTimeout(async () => {
+          if (!mounted) return;
+
           const {
             data: { session: delayedSession },
           } = await supabase.auth.getSession();
@@ -58,33 +124,48 @@ export default function ResetPasswordPage() {
 
           if (delayedSession) {
             setLinkStatus("ready");
+            setErrorMsg("");
           } else {
             setLinkStatus("invalid");
           }
-        }, 1200);
-      } catch {
+        }, 1500);
+      } catch (error) {
+        console.error(
+          "Password recovery initialization error:",
+          error
+        );
+
         if (mounted) {
           setLinkStatus("invalid");
         }
       }
     }
 
-    void checkRecoverySession();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
-      if (event === "PASSWORD_RECOVERY" && session) {
+      if (
+        (event === "PASSWORD_RECOVERY" ||
+          event === "SIGNED_IN" ||
+          event === "INITIAL_SESSION") &&
+        session
+      ) {
         setLinkStatus("ready");
         setErrorMsg("");
       }
 
-      if (event === "SIGNED_IN" && session) {
-        setLinkStatus("ready");
+      if (event === "SIGNED_OUT") {
+        setLinkStatus((currentStatus) =>
+          currentStatus === "success"
+            ? "success"
+            : currentStatus
+        );
       }
     });
+
+    void prepareRecoverySession();
 
     return () => {
       mounted = false;
@@ -110,7 +191,8 @@ export default function ResetPasswordPage() {
 
     if (
       lowerMessage.includes("weak") ||
-      lowerMessage.includes("password should be")
+      lowerMessage.includes("password should be") ||
+      lowerMessage.includes("password must be")
     ) {
       return "كلمة المرور ضعيفة، استخدم 8 أحرف على الأقل";
     }
@@ -118,7 +200,9 @@ export default function ResetPasswordPage() {
     if (
       lowerMessage.includes("session") ||
       lowerMessage.includes("jwt") ||
-      lowerMessage.includes("token")
+      lowerMessage.includes("token") ||
+      lowerMessage.includes("code") ||
+      lowerMessage.includes("expired")
     ) {
       return "انتهت صلاحية الرابط، اطلب رابطًا جديدًا";
     }
@@ -127,6 +211,10 @@ export default function ResetPasswordPage() {
   }
 
   async function changePassword() {
+    if (changingRef.current || loading) {
+      return;
+    }
+
     setMessage("");
     setErrorMsg("");
 
@@ -148,7 +236,16 @@ export default function ResetPasswordPage() {
     }
 
     if (/\s/.test(password)) {
-      setErrorMsg("كلمة المرور لا يجب أن تحتوي على مسافات");
+      setErrorMsg(
+        "كلمة المرور لا يجب أن تحتوي على مسافات"
+      );
+      return;
+    }
+
+    if (/[\u0600-\u06FF]/.test(password)) {
+      setErrorMsg(
+        "كلمة المرور لا يجب أن تحتوي على أحرف عربية"
+      );
       return;
     }
 
@@ -157,9 +254,23 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    changingRef.current = true;
     setLoading(true);
 
     try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        setLinkStatus("invalid");
+        setErrorMsg(
+          "انتهت صلاحية الرابط، اطلب رابطًا جديدًا"
+        );
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({
         password,
       });
@@ -180,10 +291,13 @@ export default function ResetPasswordPage() {
       }, 1500);
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+        error instanceof Error
+          ? error.message
+          : "Unknown error";
 
       setErrorMsg(getArabicError(errorMessage));
     } finally {
+      changingRef.current = false;
       setLoading(false);
     }
   }
@@ -287,11 +401,12 @@ export default function ResetPasswordPage() {
               placeholder="كلمة المرور الجديدة"
               value={password}
               disabled={loading}
-              onChange={(event) =>
+              onChange={(event) => {
                 setPassword(
                   cleanPasswordValue(event.target.value)
-                )
-              }
+                );
+                setErrorMsg("");
+              }}
               className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 transition focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:bg-gray-100"
               dir="ltr"
             />
@@ -302,15 +417,11 @@ export default function ResetPasswordPage() {
               placeholder="تأكيد كلمة المرور الجديدة"
               value={confirmPassword}
               disabled={loading}
-              onChange={(event) =>
+              onChange={(event) => {
                 setConfirmPassword(
                   cleanPasswordValue(event.target.value)
-                )
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !loading) {
-                  void changePassword();
-                }
+                );
+                setErrorMsg("");
               }}
               className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 transition focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:bg-gray-100"
               dir="ltr"
@@ -323,7 +434,7 @@ export default function ResetPasswordPage() {
 
             <button
               type="button"
-              onClick={() => void changePassword()}
+              onClick={changePassword}
               disabled={loading}
               className="w-full rounded-xl bg-teal-700 py-4 text-base font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >

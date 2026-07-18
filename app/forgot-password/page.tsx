@@ -44,7 +44,7 @@ export default function ForgotPasswordPage() {
       lowerMessage.includes("timeout-or-duplicate") ||
       lowerMessage.includes("request disallowed")
     ) {
-      return "فشل التحقق. افتح الموقع من رابطه الأساسي ثم أكمل التحقق مرة أخرى";
+      return "فشل التحقق. انتظر ظهور تحقق جديد ثم حاول مرة أخرى";
     }
 
     if (
@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
   }
 
   async function sendResetLink() {
-    if (sendingRef.current || loading) {
+    if (sendingRef.current) {
       return;
     }
 
@@ -117,7 +117,6 @@ export default function ForgotPasswordPage() {
       setEmail(cleanEmail);
       setCaptchaToken("");
       setStep("success");
-
       setMessage(
         "تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني ✅"
       );
@@ -126,7 +125,6 @@ export default function ForgotPasswordPage() {
         error instanceof Error ? error.message : "Unknown error";
 
       setErrorMsg(getArabicError(errorMessage));
-
       resetCaptcha();
     } finally {
       sendingRef.current = false;
@@ -135,6 +133,7 @@ export default function ForgotPasswordPage() {
   }
 
   function sendAgain() {
+    sendingRef.current = false;
     setStep("email");
     setMessage("");
     setErrorMsg("");
@@ -178,15 +177,6 @@ export default function ForgotPasswordPage() {
                 setEmail(cleanEmailValue(event.target.value));
                 setErrorMsg("");
               }}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  !loading &&
-                  captchaToken
-                ) {
-                  void sendResetLink();
-                }
-              }}
               className="mb-4 w-full rounded-xl border border-gray-300 p-4 text-base text-gray-900 placeholder:text-gray-500 transition focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:bg-gray-100"
               dir="ltr"
             />
@@ -227,7 +217,7 @@ export default function ForgotPasswordPage() {
 
             <button
               type="button"
-              onClick={() => void sendResetLink()}
+              onClick={sendResetLink}
               disabled={loading || !captchaToken}
               className="w-full rounded-xl bg-teal-700 py-4 text-base font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
