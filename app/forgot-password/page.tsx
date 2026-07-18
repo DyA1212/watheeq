@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { supabase } from "@/lib/supabase";
@@ -9,6 +9,8 @@ type Step = "email" | "success";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+
+  const sendingRef = useRef(false);
 
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -34,26 +36,27 @@ export default function ForgotPasswordPage() {
   }
 
   function getArabicError(errorMessage: string) {
-    const message = errorMessage.toLowerCase();
+    const lowerMessage = errorMessage.toLowerCase();
 
     if (
-      message.includes("captcha") ||
-      message.includes("challenge") ||
-      message.includes("timeout-or-duplicate")
+      lowerMessage.includes("captcha") ||
+      lowerMessage.includes("challenge") ||
+      lowerMessage.includes("timeout-or-duplicate") ||
+      lowerMessage.includes("request disallowed")
     ) {
-      return "انتهت صلاحية التحقق، أكمل التحقق الجديد ثم حاول مرة أخرى";
+      return "فشل التحقق. افتح الموقع من رابطه الأساسي ثم أكمل التحقق مرة أخرى";
     }
 
     if (
-      message.includes("rate limit") ||
-      message.includes("too many")
+      lowerMessage.includes("rate limit") ||
+      lowerMessage.includes("too many")
     ) {
       return "تم طلب روابط كثيرة، انتظر قليلًا ثم حاول مرة أخرى";
     }
 
     if (
-      message.includes("smtp") ||
-      message.includes("email")
+      lowerMessage.includes("smtp") ||
+      lowerMessage.includes("email")
     ) {
       return "تعذر إرسال البريد، تحقق من إعدادات البريد ثم حاول مرة أخرى";
     }
@@ -62,6 +65,10 @@ export default function ForgotPasswordPage() {
   }
 
   async function sendResetLink() {
+    if (sendingRef.current || loading) {
+      return;
+    }
+
     setErrorMsg("");
     setMessage("");
 
@@ -90,23 +97,17 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    sendingRef.current = true;
     setLoading(true);
 
     const token = captchaToken;
 
-    // منع إعادة استخدام رمز التحقق نفسه
-    
-
     try {
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/reset-password`
-          : "https://watheeq-two.vercel.app/reset-password";
-
       const { error } =
         await supabase.auth.resetPasswordForEmail(cleanEmail, {
-          redirectTo,
-         captchaToken: token,
+          redirectTo:
+            "https://watheeq-two.vercel.app/reset-password",
+          captchaToken: token,
         });
 
       if (error) {
@@ -114,7 +115,9 @@ export default function ForgotPasswordPage() {
       }
 
       setEmail(cleanEmail);
+      setCaptchaToken("");
       setStep("success");
+
       setMessage(
         "تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني ✅"
       );
@@ -123,8 +126,10 @@ export default function ForgotPasswordPage() {
         error instanceof Error ? error.message : "Unknown error";
 
       setErrorMsg(getArabicError(errorMessage));
+
       resetCaptcha();
     } finally {
+      sendingRef.current = false;
       setLoading(false);
     }
   }
@@ -169,9 +174,10 @@ export default function ForgotPasswordPage() {
               placeholder="البريد الإلكتروني"
               value={email}
               disabled={loading}
-              onChange={(event) =>
-                setEmail(cleanEmailValue(event.target.value))
-              }
+              onChange={(event) => {
+                setEmail(cleanEmailValue(event.target.value));
+                setErrorMsg("");
+              }}
               onKeyDown={(event) => {
                 if (
                   event.key === "Enter" &&
@@ -238,7 +244,7 @@ export default function ForgotPasswordPage() {
               <div className="mb-3 text-4xl">✉️</div>
 
               <p className="text-sm leading-7 text-green-800">
-                افتح الرسالة واضغط رابط تغيير كلمة المرور.
+                افتح الرسالة واضغط على رابط تغيير كلمة المرور.
                 تحقق أيضًا من مجلد الرسائل غير المرغوب فيها.
               </p>
             </div>
