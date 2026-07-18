@@ -106,7 +106,6 @@ export default function ForgotPasswordPage() {
       const { error } =
         await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo,
-          captchaToken: token,
         });
 
       if (error) {
