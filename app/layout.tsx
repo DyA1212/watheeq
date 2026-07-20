@@ -14,10 +14,34 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "وثيق",
-  description: "منصة وثيق لإدارة الصفقات بأمان",
+  title: "وثيق | منصة الصفقات الآمنة",
+  description:
+    "منصة وثيق لحفظ أموال المشتري حتى استلام المنتج ثم تحويل المبلغ للبائع بأمان.",
+
   verification: {
     google: "j8IvV93Uam2ieAkyjOsMWUbQBnFsl9kxvL9-y6-SWNk",
+  },
+
+  openGraph: {
+    title: "وثيق",
+    description:
+      "منصة وثيق للصفقات الآمنة بين البائع والمشتري.",
+    images: [
+      {
+        url: "/logo.png",
+        width: 1200,
+        height: 630,
+      },
+    ],
+    type: "website",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "وثيق",
+    description:
+      "منصة وثيق للصفقات الآمنة بين البائع والمشتري.",
+    images: ["/logo.png"],
   },
 };
 
